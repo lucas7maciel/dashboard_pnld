@@ -1,0 +1,27 @@
+<svg width="420" height="120" viewBox="0 0 420 120" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Ícone -->
+  <g transform="translate(20,20)">
+    <rect x="0" y="0" width="80" height="80" rx="18" fill="#34A853"/>
+
+    <path d="M20 55 Q35 50 40 55 Q45 50 60 55 V25 Q45 20 40 25 Q35 20 20 25 Z"
+          fill="white"/>
+
+    <line x1="40" y1="25" x2="40" y2="55"
+          stroke="#34A853"
+          stroke-width="2"/>
+  </g>
+
+  <!-- Texto -->
+  <text
+    x="120"
+    y="60"
+    dominant-baseline="middle"
+    font-family="Poppins, Arial, sans-serif"
+    font-size="52"
+    font-weight="600"
+    fill="#202124">
+    PNLD
+  </text>
+
+</svg>

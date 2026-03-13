@@ -1,0 +1,22 @@
+services:
+  generator:
+    build:
+      context: .
+      dockerfile: generator.Dockerfile
+    volumes:
+      - ./out:/data/out
+      - ../Dashboard - Objetos PNLD.xlsx:/data/input.xlsx:ro
+    command:
+      - --input
+      - /data/input.xlsx
+      - --outdir
+      - /data/out
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8501:80"
+    volumes:
+      - ./out/snapshot.json:/usr/share/nginx/html/snapshot.json:ro

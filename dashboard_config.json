@@ -1,0 +1,26 @@
+{
+  "theme": {
+    "background": "#F8F9FA",
+    "text": "#212529",
+    "ok": "#2E7D32",
+    "andamento": "#1565C0",
+    "atencao": "#ED6C02",
+    "critico": "#C62828"
+  },
+  "labels": {
+    "concluido": "Concluído",
+    "andamento": "Em andamento",
+    "sem_dados": "Sem dados"
+  },
+  "thresholds": {
+    "ok": 0.8,
+    "risco": 0.6
+  },
+  "fase_map": {
+    "VI": "VALIDAÇÃO DE INSCRIÇÃO",
+    "AP": "AVALIAÇÃO PEDAGÓGICA",
+    "ATRIB": "ANÁLISE DE ATRIBUTOS",
+    "ACESS": "ACESSIBILIDADE",
+    "IQ": "INSUMOS DE QUALIFICAÇÃO"
+  }
+}
