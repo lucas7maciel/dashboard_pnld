@@ -32,12 +32,14 @@ const FALLBACK_CRONOGRAMA = {
   },
   atividades_suspensas: [
     {
-      Objeto: "PNLD EJA 2026-2029 - Objeto 01: Obras Didáticas destinadas à Educação de Jovens e Adultos (EJA)",
+      Objeto:
+        "PNLD EJA 2026-2029 - Objeto 01: Obras Didáticas destinadas à Educação de Jovens e Adultos (EJA)",
       Atividade: "Validação documental complementar",
       Status: "Suspenso",
     },
     {
-      Objeto: "PNLD 2024-2027 - ANOS FINAIS - Objeto: 03 - Obras Literárias destinadas aos Anos Finais",
+      Objeto:
+        "PNLD 2024-2027 - ANOS FINAIS - Objeto: 03 - Obras Literárias destinadas aos Anos Finais",
       Atividade: "Revisão de parecer pedagógico",
       Status: "Suspenso",
     },
@@ -57,7 +59,7 @@ const PHASES_ORDER = [
 ];
 
 const STATUS_TONE = {
-  "CONCLUÍDO": "ok",
+  CONCLUÍDO: "ok",
   "EM ANDAMENTO": "andamento",
   "SEM DADOS": "critico",
   FINALIZADO: "ok",
@@ -87,7 +89,10 @@ const sanitizeSnapshot = (value) => {
 
   if (value && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value).map(([key, innerValue]) => [key, sanitizeSnapshot(innerValue)]),
+      Object.entries(value).map(([key, innerValue]) => [
+        key,
+        sanitizeSnapshot(innerValue),
+      ]),
     );
   }
 
@@ -167,7 +172,9 @@ const formatPhaseAxisLabel = (phase) => {
 };
 
 const fetchSnapshot = async () => {
-  const response = await fetch(`${PUBLIC_BASE_URL}snapshot.json`, { cache: "no-store" });
+  const response = await fetch(`${PUBLIC_BASE_URL}snapshot.json`, {
+    cache: "no-store",
+  });
   if (!response.ok) {
     throw new Error("Snapshot não encontrado");
   }
@@ -179,7 +186,9 @@ const fetchSnapshot = async () => {
 const getStatusCounts = (items = []) => {
   const counts = {};
   items.forEach((item) => {
-    const status = decodePossibleMojibake(item.status_objeto || "SEM DADOS").toUpperCase();
+    const status = decodePossibleMojibake(
+      item.status_objeto || "SEM DADOS",
+    ).toUpperCase();
     counts[status] = (counts[status] || 0) + 1;
   });
   return counts;
@@ -201,8 +210,12 @@ const getRiskRanking = (objects = []) =>
       taxaAprovacao: Number(item?.kpis?.taxa_aprovacao),
     }))
     .sort((left, right) => {
-      const leftRate = Number.isFinite(left.taxaAprovacao) ? left.taxaAprovacao : Infinity;
-      const rightRate = Number.isFinite(right.taxaAprovacao) ? right.taxaAprovacao : Infinity;
+      const leftRate = Number.isFinite(left.taxaAprovacao)
+        ? left.taxaAprovacao
+        : Infinity;
+      const rightRate = Number.isFinite(right.taxaAprovacao)
+        ? right.taxaAprovacao
+        : Infinity;
       return leftRate - rightRate;
     });
 
@@ -219,7 +232,9 @@ const getHighlights = (objects = []) =>
   });
 
 const extractApprovedCount = (text) => {
-  const match = decodePossibleMojibake(String(text || "")).match(/(\d+)\s+coleç(?:ões|ao|ões)/i);
+  const match = decodePossibleMojibake(String(text || "")).match(
+    /(\d+)\s+coleç(?:ões|ao|ões)/i,
+  );
   return match ? Number(match[1]) : null;
 };
 
@@ -292,7 +307,11 @@ const CollapseIcon = ({ collapsed }) => (
   >
     <path d="M4 5h16v14H4z" />
     <path d="M9 5v14" />
-    {collapsed ? <path d="m14 12 3-3v6l-3-3Z" /> : <path d="m10 12 4-3v6l-4-3Z" />}
+    {collapsed ? (
+      <path d="m14 12 3-3v6l-3-3Z" />
+    ) : (
+      <path d="m10 12 4-3v6l-4-3Z" />
+    )}
   </svg>
 );
 
@@ -383,7 +402,12 @@ const StatusBadge = ({ label, tone }) => (
 
 const InfoTooltip = ({ text }) => (
   <span className="info-tooltip">
-    <button type="button" className="info-tooltip-trigger" aria-label={text} title={text}>
+    <button
+      type="button"
+      className="info-tooltip-trigger"
+      aria-label={text}
+      title={text}
+    >
       <InfoIcon />
     </button>
     <span className="info-tooltip-content" role="tooltip">
@@ -407,7 +431,11 @@ const MultilineAxisTick = ({ x, y, payload, color }) => {
         fontSize={13}
       >
         {lines.map((line, index) => (
-          <tspan key={`${payload?.value}-${index}`} x={0} dy={index === 0 ? 0 : 16}>
+          <tspan
+            key={`${payload?.value}-${index}`}
+            x={0}
+            dy={index === 0 ? 0 : 16}
+          >
             {line}
           </tspan>
         ))}
@@ -435,7 +463,8 @@ export default function App() {
         if (!cancelled) setSnapshot(data);
       })
       .catch((fetchError) => {
-        if (!cancelled) setError(fetchError.message || "Erro ao carregar snapshot");
+        if (!cancelled)
+          setError(fetchError.message || "Erro ao carregar snapshot");
       });
 
     return () => {
@@ -446,7 +475,13 @@ export default function App() {
   useEffect(() => {
     const syncFromHash = () => {
       const hash = window.location.hash.replace("#", "").trim().toLowerCase();
-      const allowedTabs = ["panorama", "objetos", "cronograma", "indicadores", "exploracao"];
+      const allowedTabs = [
+        "panorama",
+        "objetos",
+        "cronograma",
+        "indicadores",
+        "exploracao",
+      ];
       setActiveTab(allowedTabs.includes(hash) ? hash : "panorama");
     };
 
@@ -567,14 +602,22 @@ export default function App() {
     () =>
       phaseKpis.map((item) => ({
         fase: formatDisplayText(item.fase),
-        aprovacao: Number.isFinite(item.taxaAprovacao) ? item.taxaAprovacao * 100 : null,
+        aprovacao: Number.isFinite(item.taxaAprovacao)
+          ? item.taxaAprovacao * 100
+          : null,
       })),
     [phaseKpis],
   );
 
-  const statusChartConfig = useMemo(() => ({ total: { label: "Objetos" } }), []);
+  const statusChartConfig = useMemo(
+    () => ({ total: { label: "Objetos" } }),
+    [],
+  );
 
-  const cronogramaChartConfig = useMemo(() => ({ total: { label: "Atividades" } }), []);
+  const cronogramaChartConfig = useMemo(
+    () => ({ total: { label: "Atividades" } }),
+    [],
+  );
 
   const phaseChartConfig = useMemo(
     () => ({
@@ -592,9 +635,10 @@ export default function App() {
     [chartTheme.line],
   );
 
-  const logoTextSrc = theme === "light"
-    ? `${PUBLIC_BASE_URL}logo_text.svg`
-    : `${PUBLIC_BASE_URL}logo_text_dark.svg`;
+  const logoTextSrc =
+    theme === "light"
+      ? `${PUBLIC_BASE_URL}logo_text.svg`
+      : `${PUBLIC_BASE_URL}logo_text_dark.svg`;
 
   if (error) {
     return (
@@ -624,7 +668,9 @@ export default function App() {
         aria-label="Fechar menu"
         onClick={() => setIsMobileMenuOpen(false)}
       />
-      <aside className={`sidebar${isSidebarCollapsed ? " collapsed" : ""}${isMobileMenuOpen ? " mobile-open" : ""}`}>
+      <aside
+        className={`sidebar${isSidebarCollapsed ? " collapsed" : ""}${isMobileMenuOpen ? " mobile-open" : ""}`}
+      >
         <div className="sidebar-header">
           <div className="brand">
             <img
@@ -632,7 +678,11 @@ export default function App() {
               alt="PNLD"
               className="brand-logo brand-logo-icon"
             />
-            <img src={logoTextSrc} alt="PNLD" className="brand-logo brand-logo-text" />
+            <img
+              src={logoTextSrc}
+              alt="PNLD"
+              className="brand-logo brand-logo-text"
+            />
           </div>
         </div>
 
@@ -677,7 +727,9 @@ export default function App() {
               type="button"
               className="sidebar-toggle topbar-toggle"
               onClick={() => setIsSidebarCollapsed((current) => !current)}
-              aria-label={isSidebarCollapsed ? "Maximizar sidebar" : "Minimizar sidebar"}
+              aria-label={
+                isSidebarCollapsed ? "Maximizar sidebar" : "Minimizar sidebar"
+              }
             >
               <CollapseIcon collapsed={isSidebarCollapsed} />
             </button>
@@ -687,179 +739,259 @@ export default function App() {
           <button
             type="button"
             className="theme-toggle"
-            onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
-            aria-label={theme === "light" ? "Ativar tema escuro" : "Ativar tema claro"}
-            title={theme === "light" ? "Ativar tema escuro" : "Ativar tema claro"}
+            onClick={() =>
+              setTheme((current) => (current === "light" ? "dark" : "light"))
+            }
+            aria-label={
+              theme === "light" ? "Ativar tema escuro" : "Ativar tema claro"
+            }
+            title={
+              theme === "light" ? "Ativar tema escuro" : "Ativar tema claro"
+            }
           >
             {theme === "light" ? <MoonIcon /> : <SunIcon />}
           </button>
         </header>
 
         {activeTab === "panorama" && (
-          <section className="grid panorama-grid">
-            <article className="card metric">
-              <div className="metric-header">
-                <h3>Total Objetos</h3>
-                <InfoTooltip text="Total de objetos disponíveis no snapshot." />
-              </div>
-              <h2>{formatNumber(resumo.total_objetos)}</h2>
-            </article>
-
-            <article className="card metric">
-              <div className="metric-header">
-                <h3>Concluídos</h3>
-                <InfoTooltip text="Objetos com fase de qualificação finalizada." />
-              </div>
-              <h2>{formatNumber(resumo.concluidos)}</h2>
-            </article>
-
-            <article className="card metric">
-              <div className="metric-header">
-                <h3>Em andamento</h3>
-                <InfoTooltip text="Objetos com alguma fase iniciada e sem conclusão final." />
-              </div>
-              <h2>{formatNumber(resumo.em_andamento)}</h2>
-            </article>
-
-            <article className="card metric">
-              <div className="metric-header">
-                <h3>Concluído</h3>
-                <InfoTooltip text="Percentual de objetos concluídos em relação ao total." />
-              </div>
-              <h2>{formatPercent(resumo.percentual_concluido)}</h2>
-            </article>
-
-            <article className="card highlight">
-              <div className="card-head">
-                <div className="highlight-heading">
-                  <h3>Próximo Objeto</h3>
-                  <span className="highlight-eyebrow">Em foco</span>
+          <>
+            <section className="panorama-metrics">
+              <article className="card metric">
+                <div className="metric-header">
+                  <h3>Total Objetos</h3>
+                  <InfoTooltip text="Total de objetos disponíveis no snapshot." />
                 </div>
-                <InfoTooltip text="Regra = fase mais inicial; desempate por maior volume aprovado." />
-              </div>
+                <h2>{formatNumber(resumo.total_objetos)}</h2>
+              </article>
 
-              <div className="highlight-body">
-                <div className="highlight-main">
-                  <h2 className="title">{nextObject?.nome || FALLBACK_TEXT}</h2>
-                  <p className="highlight-summary">
-                    {nextObject?.motivo || "Nenhum objeto definido como destaque no snapshot."}
-                  </p>
+              <article className="card metric">
+                <div className="metric-header">
+                  <h3>Concluídos</h3>
+                  <InfoTooltip text="Objetos com fase de qualificação finalizada." />
                 </div>
+                <h2>{formatNumber(resumo.concluidos)}</h2>
+              </article>
 
-                <div className="highlight-meta">
-                  <div className="highlight-pill">
-                    <span>Fase atual</span>
-                    <strong>{formatDisplayText(nextObject?.fase_atual)}</strong>
+              <article className="card metric">
+                <div className="metric-header">
+                  <h3>Em andamento</h3>
+                  <InfoTooltip text="Objetos com alguma fase iniciada e sem conclusão final." />
+                </div>
+                <h2>{formatNumber(resumo.em_andamento)}</h2>
+              </article>
+
+              <article className="card metric">
+                <div className="metric-header">
+                  <h3>Concluído</h3>
+                  <InfoTooltip text="Percentual de objetos concluídos em relação ao total." />
+                </div>
+                <h2>{formatPercent(resumo.percentual_concluido)}</h2>
+              </article>
+            </section>
+            <section className="grid panorama-grid">
+              <article className="card highlight">
+                <div className="card-head">
+                  <div className="highlight-heading">
+                    <h3>Próximo Objeto</h3>
+                    <span className="highlight-eyebrow">Em foco</span>
                   </div>
-                  <div className="highlight-pill highlight-pill-accent">
-                    <span>Aprovadas</span>
-                    <strong>{formatNumber(nextObjectApprovedCount)}</strong>
+                  <InfoTooltip text="Regra = fase mais inicial; desempate por maior volume aprovado." />
+                </div>
+
+                <div className="highlight-body">
+                  <div className="highlight-main">
+                    <h2 className="title">
+                      {nextObject?.nome || FALLBACK_TEXT}
+                    </h2>
+                    <p className="highlight-summary">
+                      {nextObject?.motivo ||
+                        "Nenhum objeto definido como destaque no snapshot."}
+                    </p>
+                  </div>
+
+                  <div className="highlight-meta">
+                    <div className="highlight-pill">
+                      <span>Fase atual</span>
+                      <strong>
+                        {formatDisplayText(nextObject?.fase_atual)}
+                      </strong>
+                    </div>
+                    <div className="highlight-pill highlight-pill-accent">
+                      <span>Aprovadas</span>
+                      <strong>{formatNumber(nextObjectApprovedCount)}</strong>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </article>
+              </article>
 
-            <article className="card chart">
-              <div className="card-head">
-                <h3>Status dos Objetos</h3>
-                <InfoTooltip text="Legenda: Concluído, Em andamento e Sem dados." />
-              </div>
-              <ChartContainer className="plot plot-fade-in" config={statusChartConfig}>
-                <BarChart data={statusChartRows} margin={{ top: 12, right: 12, bottom: 16, left: 12 }}>
-                  <CartesianGrid vertical={false} stroke={chartTheme.grid} />
-                  <XAxis
-                    dataKey="status"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: chartTheme.text, fontFamily: CHART_FONT_FAMILY, fontSize: 13 }}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: chartTheme.text, fontFamily: CHART_FONT_FAMILY, fontSize: 13 }}
-                  />
-                  <ChartTooltip
-                    cursor={{ fill: "rgba(148, 163, 184, 0.12)" }}
-                    content={<ChartTooltipContent valueFormatter={(value) => formatNumber(value)} />}
-                  />
-                  <Bar dataKey="total" radius={[10, 10, 0, 0]}>
-                    {statusChartRows.map((entry) => (
-                      <Cell key={entry.status} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
-            </article>
-
-            <article className="card chart">
-              <div className="card-head">
-                <h3>Cronograma</h3>
-                <InfoTooltip text='Status = contagem de status da aba "Status Cronograma".' />
-              </div>
-              <ChartContainer className="plot plot-fade-in" config={cronogramaChartConfig}>
-                <PieChart margin={{ top: 12, right: 12, bottom: 12, left: 12 }}>
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        hideLabel
-                        valueFormatter={(value) => `${formatNumber(value)} atividades`}
-                      />
-                    }
-                  />
-                  <Pie
-                    data={cronogramaDonutRows}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius="58%"
-                    outerRadius="82%"
-                    paddingAngle={3}
-                    strokeWidth={0}
-                    label={({ percent }) => (percent ? `${Math.round(percent * 100)}%` : "")}
-                    labelLine={false}
+              <article className="card chart">
+                <div className="card-head">
+                  <h3>Status dos Objetos</h3>
+                  <InfoTooltip text="Legenda: Concluído, Em andamento e Sem dados." />
+                </div>
+                <ChartContainer
+                  className="plot plot-fade-in"
+                  config={statusChartConfig}
+                >
+                  <BarChart
+                    data={statusChartRows}
+                    margin={{ top: 12, right: 12, bottom: 16, left: 12 }}
                   >
-                    {cronogramaDonutRows.map((entry) => (
-                      <Cell key={entry.name} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <ChartLegend verticalAlign="middle" align="right" layout="vertical" content={<ChartLegendContent />} />
-                </PieChart>
-              </ChartContainer>
-            </article>
+                    <CartesianGrid vertical={false} stroke={chartTheme.grid} />
+                    <XAxis
+                      dataKey="status"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{
+                        fill: chartTheme.text,
+                        fontFamily: CHART_FONT_FAMILY,
+                        fontSize: 13,
+                      }}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{
+                        fill: chartTheme.text,
+                        fontFamily: CHART_FONT_FAMILY,
+                        fontSize: 13,
+                      }}
+                    />
+                    <ChartTooltip
+                      cursor={{ fill: "rgba(148, 163, 184, 0.12)" }}
+                      content={
+                        <ChartTooltipContent
+                          valueFormatter={(value) => formatNumber(value)}
+                        />
+                      }
+                    />
+                    <Bar dataKey="total" radius={[10, 10, 0, 0]}>
+                      {statusChartRows.map((entry) => (
+                        <Cell key={entry.status} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+              </article>
 
-            <article className="card chart wide">
-              <div className="card-head">
-                <h3>KPIs por fase</h3>
-                <InfoTooltip text="Coleções por fase: entrada, aprovadas e invalidadas." />
-              </div>
-              <ChartContainer className="plot plot-fade-in" config={phaseChartConfig}>
-                <BarChart data={phaseChartRows} margin={{ top: 14, right: 12, bottom: 32, left: 12 }}>
-                  <CartesianGrid vertical={false} stroke={chartTheme.grid} />
-                  <XAxis
-                    dataKey="fase"
-                    height={70}
-                    tickLine={false}
-                    axisLine={false}
-                    interval={0}
-                    tick={(props) => <MultilineAxisTick {...props} color={chartTheme.text} />}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: chartTheme.text, fontFamily: CHART_FONT_FAMILY, fontSize: 13 }}
-                  />
-                  <ChartTooltip
-                    content={<ChartTooltipContent valueFormatter={(value) => formatNumber(value)} />}
-                  />
-                  <ChartLegend verticalAlign="top" align="right" content={<ChartLegendContent />} />
-                  <Bar dataKey="invalidadas" stackId="phase" fill="var(--color-invalidadas)" radius={[0, 0, 6, 6]} />
-                  <Bar dataKey="aprovadas" stackId="phase" fill="var(--color-aprovadas)" />
-                  <Bar dataKey="entrada" stackId="phase" fill="var(--color-entrada)" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ChartContainer>
-            </article>
-          </section>
+              <article className="card chart">
+                <div className="card-head">
+                  <h3>Cronograma</h3>
+                  <InfoTooltip text='Status = contagem de status da aba "Status Cronograma".' />
+                </div>
+                <ChartContainer
+                  className="plot plot-fade-in"
+                  config={cronogramaChartConfig}
+                >
+                  <PieChart
+                    margin={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                  >
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          hideLabel
+                          valueFormatter={(value) =>
+                            `${formatNumber(value)} atividades`
+                          }
+                        />
+                      }
+                    />
+                    <Pie
+                      data={cronogramaDonutRows}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius="58%"
+                      outerRadius="82%"
+                      paddingAngle={3}
+                      strokeWidth={0}
+                      label={({ percent }) =>
+                        percent ? `${Math.round(percent * 100)}%` : ""
+                      }
+                      labelLine={false}
+                    >
+                      {cronogramaDonutRows.map((entry) => (
+                        <Cell key={entry.name} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <ChartLegend
+                      verticalAlign="middle"
+                      align="right"
+                      layout="vertical"
+                      content={<ChartLegendContent />}
+                    />
+                  </PieChart>
+                </ChartContainer>
+              </article>
+
+              <article className="card chart wide">
+                <div className="card-head">
+                  <h3>KPIs por fase</h3>
+                  <InfoTooltip text="Coleções por fase: entrada, aprovadas e invalidadas." />
+                </div>
+                <ChartContainer
+                  className="plot plot-fade-in"
+                  config={phaseChartConfig}
+                >
+                  <BarChart
+                    data={phaseChartRows}
+                    margin={{ top: 14, right: 12, bottom: 32, left: 12 }}
+                  >
+                    <CartesianGrid vertical={false} stroke={chartTheme.grid} />
+                    <XAxis
+                      dataKey="fase"
+                      height={70}
+                      tickLine={false}
+                      axisLine={false}
+                      interval={0}
+                      tick={(props) => (
+                        <MultilineAxisTick {...props} color={chartTheme.text} />
+                      )}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{
+                        fill: chartTheme.text,
+                        fontFamily: CHART_FONT_FAMILY,
+                        fontSize: 13,
+                      }}
+                    />
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          valueFormatter={(value) => formatNumber(value)}
+                        />
+                      }
+                    />
+                    <ChartLegend
+                      verticalAlign="top"
+                      align="right"
+                      content={<ChartLegendContent />}
+                    />
+                    <Bar
+                      dataKey="invalidadas"
+                      stackId="phase"
+                      fill="var(--color-invalidadas)"
+                      radius={[0, 0, 6, 6]}
+                    />
+                    <Bar
+                      dataKey="aprovadas"
+                      stackId="phase"
+                      fill="var(--color-aprovadas)"
+                    />
+                    <Bar
+                      dataKey="entrada"
+                      stackId="phase"
+                      fill="var(--color-entrada)"
+                      radius={[6, 6, 0, 0]}
+                    />
+                  </BarChart>
+                </ChartContainer>
+              </article>
+            </section>
+          </>
         )}
 
         {activeTab === "objetos" && (
@@ -872,11 +1004,18 @@ export default function App() {
 
               <div className="detail-stack">
                 {highlights.map((item, index) => (
-                  <article key={item.id} className="detail-card detail-spotlight">
-                    <div className="detail-rank">{String(index + 1).padStart(2, "0")}</div>
+                  <article
+                    key={item.id}
+                    className="detail-card detail-spotlight"
+                  >
+                    <div className="detail-rank">
+                      {String(index + 1).padStart(2, "0")}
+                    </div>
                     <div className="detail-content">
                       <strong>{item.nome}</strong>
-                      <span className="detail-phase">{formatDisplayText(item.fase_atual)}</span>
+                      <span className="detail-phase">
+                        {formatDisplayText(item.fase_atual)}
+                      </span>
                       <div className="detail-meta-row">
                         <span className="detail-meta-label">Aprovadas</span>
                         <span className="detail-meta-value">
@@ -917,9 +1056,13 @@ export default function App() {
                             tone={getStatusTone(item.status_objeto)}
                           />
                         </td>
-                        <td className="object-phase-cell">{formatDisplayText(item.fase_atual)}</td>
+                        <td className="object-phase-cell">
+                          {formatDisplayText(item.fase_atual)}
+                        </td>
                         <td className="object-approval-cell">
-                          {formatPercent((Number(item?.kpis?.taxa_aprovacao) || 0) * 100)}
+                          {formatPercent(
+                            (Number(item?.kpis?.taxa_aprovacao) || 0) * 100,
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -941,9 +1084,14 @@ export default function App() {
               {cronograma.atividades_suspensas?.length ? (
                 <ul className="list">
                   {cronograma.atividades_suspensas.map((item, index) => (
-                    <li key={`${item.Objeto}-${item.Atividade}-${index}`} className="suspension-item">
+                    <li
+                      key={`${item.Objeto}-${item.Atividade}-${index}`}
+                      className="suspension-item"
+                    >
                       <div className="suspension-main">
-                        <div className="suspension-index">{String(index + 1).padStart(2, "0")}</div>
+                        <div className="suspension-index">
+                          {String(index + 1).padStart(2, "0")}
+                        </div>
                         <div className="suspension-content">
                           <strong>{item.Objeto || FALLBACK_TEXT}</strong>
                           <p className="suspension-subtitle">
@@ -953,12 +1101,17 @@ export default function App() {
                           </p>
                         </div>
                       </div>
-                      <StatusBadge label={item.Status || "Suspenso"} tone="critico" />
+                      <StatusBadge
+                        label={item.Status || "Suspenso"}
+                        tone="critico"
+                      />
                     </li>
                   ))}
                 </ul>
               ) : (
-                <div className="suspension-empty">Nenhuma atividade suspensa no cronograma.</div>
+                <div className="suspension-empty">
+                  Nenhuma atividade suspensa no cronograma.
+                </div>
               )}
             </article>
 
@@ -968,29 +1121,53 @@ export default function App() {
                 <InfoTooltip text='Status = contagem por status na aba "Status Cronograma".' />
               </div>
               {cronogramaBarRows.length ? (
-                <ChartContainer className="plot plot-fade-in" config={cronogramaChartConfig}>
-                  <BarChart data={cronogramaBarRows} margin={{ top: 12, right: 12, bottom: 16, left: 12 }}>
+                <ChartContainer
+                  className="plot plot-fade-in"
+                  config={cronogramaChartConfig}
+                >
+                  <BarChart
+                    data={cronogramaBarRows}
+                    margin={{ top: 12, right: 12, bottom: 16, left: 12 }}
+                  >
                     <CartesianGrid vertical={false} stroke={chartTheme.grid} />
                     <XAxis
                       dataKey="status"
                       tickLine={false}
                       axisLine={false}
-                      tick={{ fill: chartTheme.text, fontFamily: CHART_FONT_FAMILY, fontSize: 13 }}
+                      tick={{
+                        fill: chartTheme.text,
+                        fontFamily: CHART_FONT_FAMILY,
+                        fontSize: 13,
+                      }}
                     />
                     <YAxis
                       allowDecimals={false}
                       tickLine={false}
                       axisLine={false}
-                      tick={{ fill: chartTheme.text, fontFamily: CHART_FONT_FAMILY, fontSize: 13 }}
+                      tick={{
+                        fill: chartTheme.text,
+                        fontFamily: CHART_FONT_FAMILY,
+                        fontSize: 13,
+                      }}
                     />
                     <ChartTooltip
-                      content={<ChartTooltipContent valueFormatter={(value) => formatNumber(value)} />}
+                      content={
+                        <ChartTooltipContent
+                          valueFormatter={(value) => formatNumber(value)}
+                        />
+                      }
                     />
-                    <Bar dataKey="total" fill={chartTheme.bar} radius={[10, 10, 0, 0]} />
+                    <Bar
+                      dataKey="total"
+                      fill={chartTheme.bar}
+                      radius={[10, 10, 0, 0]}
+                    />
                   </BarChart>
                 </ChartContainer>
               ) : (
-                <div className="chart-empty">Nenhum status disponível no cronograma.</div>
+                <div className="chart-empty">
+                  Nenhum status disponível no cronograma.
+                </div>
               )}
             </article>
           </section>
@@ -1029,7 +1206,11 @@ export default function App() {
                         tone={getStatusTone(item.status_objeto)}
                       />
                     </div>
-                    <span>{formatPercent((Number(item?.kpis?.taxa_aprovacao) || 0) * 100)}</span>
+                    <span>
+                      {formatPercent(
+                        (Number(item?.kpis?.taxa_aprovacao) || 0) * 100,
+                      )}
+                    </span>
                   </article>
                 ))}
               </div>
@@ -1040,24 +1221,42 @@ export default function App() {
                 <h3>Aprovação por fase</h3>
                 <InfoTooltip text="Taxa por fase = aprovadas ÷ entrada × 100 (por fase)." />
               </div>
-              <ChartContainer className="plot tall plot-fade-in" config={approvalChartConfig}>
-                <LineChart data={approvalByPhaseRows} margin={{ top: 18, right: 16, bottom: 24, left: 12 }}>
+              <ChartContainer
+                className="plot tall plot-fade-in"
+                config={approvalChartConfig}
+              >
+                <LineChart
+                  data={approvalByPhaseRows}
+                  margin={{ top: 18, right: 16, bottom: 24, left: 12 }}
+                >
                   <CartesianGrid vertical={false} stroke={chartTheme.grid} />
                   <XAxis
                     dataKey="fase"
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: chartTheme.text, fontFamily: CHART_FONT_FAMILY, fontSize: 12 }}
+                    tick={{
+                      fill: chartTheme.text,
+                      fontFamily: CHART_FONT_FAMILY,
+                      fontSize: 12,
+                    }}
                   />
                   <YAxis
                     domain={[0, 105]}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(value) => `${value}%`}
-                    tick={{ fill: chartTheme.text, fontFamily: CHART_FONT_FAMILY, fontSize: 12 }}
+                    tick={{
+                      fill: chartTheme.text,
+                      fontFamily: CHART_FONT_FAMILY,
+                      fontSize: 12,
+                    }}
                   />
                   <ChartTooltip
-                    content={<ChartTooltipContent valueFormatter={(value) => formatPercent(value)} />}
+                    content={
+                      <ChartTooltipContent
+                        valueFormatter={(value) => formatPercent(value)}
+                      />
+                    }
                   />
                   <Line
                     type="monotone"
@@ -1087,14 +1286,6 @@ export default function App() {
           <section className="grid full">
             <article className="card full">
               <div className="card-head">
-                <h3>Snapshot bruto</h3>
-                <InfoTooltip text="Fonte única: out/snapshot.json" />
-              </div>
-              <pre className="json">{JSON.stringify(snapshot, null, 2)}</pre>
-            </article>
-
-            <article className="card full">
-              <div className="card-head">
                 <h3>Objetos detalhados</h3>
                 <InfoTooltip text="Tabela com status e marcos por fase para cada objeto." />
               </div>
@@ -1119,14 +1310,27 @@ export default function App() {
                           </td>
                           <td>{formatDisplayText(fase.fase)}</td>
                           <td>{formatDisplayText(fase.status_fase)}</td>
-                          <td>{fase.inicio || fase.previsao_inicio || FALLBACK_TEXT}</td>
-                          <td>{fase.fim || fase.previsao_fim || FALLBACK_TEXT}</td>
+                          <td>
+                            {fase.inicio ||
+                              fase.previsao_inicio ||
+                              FALLBACK_TEXT}
+                          </td>
+                          <td>
+                            {fase.fim || fase.previsao_fim || FALLBACK_TEXT}
+                          </td>
                         </tr>
                       )),
                     )}
                   </tbody>
                 </table>
               </div>
+            </article>
+            <article className="card full">
+              <div className="card-head">
+                <h3>Snapshot bruto</h3>
+                <InfoTooltip text="Fonte única: out/snapshot.json" />
+              </div>
+              <pre className="json">{JSON.stringify(snapshot, null, 2)}</pre>
             </article>
           </section>
         )}
