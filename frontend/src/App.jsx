@@ -424,7 +424,7 @@ const MultilineAxisTick = ({ x, y, payload, color }) => {
       <text
         x={0}
         y={0}
-        dy={14}
+        dy={24}
         textAnchor="middle"
         fill={color}
         fontFamily={CHART_FONT_FAMILY}
@@ -933,66 +933,70 @@ export default function App() {
                   <h3>KPIs por fase</h3>
                   <InfoTooltip text="Coleções por fase: entrada, aprovadas e invalidadas." />
                 </div>
-                <ChartContainer
-                  className="plot plot-fade-in"
-                  config={phaseChartConfig}
-                >
-                  <BarChart
-                    data={phaseChartRows}
-                    margin={{ top: 14, right: 12, bottom: 32, left: 12 }}
+                <div className="phase-chart-scroll-shell">
+                  <ChartContainer
+                    className="plot plot-fade-in phase-chart-scroll-content"
+                    config={phaseChartConfig}
                   >
-                    <CartesianGrid vertical={false} stroke={chartTheme.grid} />
-                    <XAxis
-                      dataKey="fase"
-                      height={70}
-                      tickLine={false}
-                      axisLine={false}
-                      interval={0}
-                      tick={(props) => (
-                        <MultilineAxisTick {...props} color={chartTheme.text} />
-                      )}
-                    />
-                    <YAxis
-                      allowDecimals={false}
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{
-                        fill: chartTheme.text,
-                        fontFamily: CHART_FONT_FAMILY,
-                        fontSize: 13,
-                      }}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          valueFormatter={(value) => formatNumber(value)}
-                        />
-                      }
-                    />
-                    <ChartLegend
-                      verticalAlign="top"
-                      align="right"
-                      content={<ChartLegendContent />}
-                    />
-                    <Bar
-                      dataKey="invalidadas"
-                      stackId="phase"
-                      fill="var(--color-invalidadas)"
-                      radius={[0, 0, 6, 6]}
-                    />
-                    <Bar
-                      dataKey="aprovadas"
-                      stackId="phase"
-                      fill="var(--color-aprovadas)"
-                    />
-                    <Bar
-                      dataKey="entrada"
-                      stackId="phase"
-                      fill="var(--color-entrada)"
-                      radius={[6, 6, 0, 0]}
-                    />
-                  </BarChart>
-                </ChartContainer>
+                    <BarChart
+                      data={phaseChartRows}
+                      margin={{ top: 14, right: 12, bottom: 0, left: 12 }}
+                    >
+                      <CartesianGrid vertical={false} stroke={chartTheme.grid} />
+                      <XAxis
+                        dataKey="fase"
+                        height={70}
+                        tickMargin={14}
+                        tickLine={false}
+                        axisLine={false}
+                        interval={0}
+                        tick={(props) => (
+                          <MultilineAxisTick {...props} color={chartTheme.text} />
+                        )}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{
+                          fill: chartTheme.text,
+                          fontFamily: CHART_FONT_FAMILY,
+                          fontSize: 13,
+                        }}
+                      />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            valueFormatter={(value) => formatNumber(value)}
+                          />
+                        }
+                      />
+                      <ChartLegend
+                        verticalAlign="top"
+                        align="right"
+                        wrapperStyle={{ top: 0 }}
+                        content={<ChartLegendContent />}
+                      />
+                      <Bar
+                        dataKey="invalidadas"
+                        stackId="phase"
+                        fill="var(--color-invalidadas)"
+                        radius={[0, 0, 6, 6]}
+                      />
+                      <Bar
+                        dataKey="aprovadas"
+                        stackId="phase"
+                        fill="var(--color-aprovadas)"
+                      />
+                      <Bar
+                        dataKey="entrada"
+                        stackId="phase"
+                        fill="var(--color-entrada)"
+                        radius={[6, 6, 0, 0]}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
               </article>
             </section>
           </>
