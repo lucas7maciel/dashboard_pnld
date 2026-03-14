@@ -452,7 +452,7 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return stored === "light" ? "light" : "dark";
+    return stored === "dark" ? "dark" : "light";
   });
 
   useEffect(() => {
