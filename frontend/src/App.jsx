@@ -705,8 +705,12 @@ export default function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <p>Portfólio de Projetos do PNLD</p>
-          <p>NEES / UFAL | 2026</p>
+          <img
+            src={`${PUBLIC_BASE_URL}PNLD_TRINCA_preview.png`}
+            alt="PNLD Trinca"
+            className="sidebar-footer-mark"
+          />
+          <p>Portfólio de Projetos do PNLD - NEES/UFAL | 2026</p>
         </div>
       </aside>
 
@@ -829,50 +833,52 @@ export default function App() {
                   <h3>Status dos Objetos</h3>
                   <InfoTooltip text="Legenda: Concluído, Em andamento e Sem dados." />
                 </div>
-                <ChartContainer
-                  className="plot plot-fade-in"
-                  config={statusChartConfig}
-                >
-                  <BarChart
-                    data={statusChartRows}
-                    margin={{ top: 12, right: 12, bottom: 16, left: 12 }}
+                <div className="status-chart-scroll-shell">
+                  <ChartContainer
+                    className="plot plot-fade-in status-chart-scroll-content"
+                    config={statusChartConfig}
                   >
-                    <CartesianGrid vertical={false} stroke={chartTheme.grid} />
-                    <XAxis
-                      dataKey="status"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{
-                        fill: chartTheme.text,
-                        fontFamily: CHART_FONT_FAMILY,
-                        fontSize: 13,
-                      }}
-                    />
-                    <YAxis
-                      allowDecimals={false}
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{
-                        fill: chartTheme.text,
-                        fontFamily: CHART_FONT_FAMILY,
-                        fontSize: 13,
-                      }}
-                    />
-                    <ChartTooltip
-                      cursor={{ fill: "rgba(148, 163, 184, 0.12)" }}
-                      content={
-                        <ChartTooltipContent
-                          valueFormatter={(value) => formatNumber(value)}
-                        />
-                      }
-                    />
-                    <Bar dataKey="total" radius={[10, 10, 0, 0]}>
-                      {statusChartRows.map((entry) => (
-                        <Cell key={entry.status} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ChartContainer>
+                    <BarChart
+                      data={statusChartRows}
+                      margin={{ top: 12, right: 12, bottom: 16, left: 12 }}
+                    >
+                      <CartesianGrid vertical={false} stroke={chartTheme.grid} />
+                      <XAxis
+                        dataKey="status"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{
+                          fill: chartTheme.text,
+                          fontFamily: CHART_FONT_FAMILY,
+                          fontSize: 13,
+                        }}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{
+                          fill: chartTheme.text,
+                          fontFamily: CHART_FONT_FAMILY,
+                          fontSize: 13,
+                        }}
+                      />
+                      <ChartTooltip
+                        cursor={{ fill: "rgba(148, 163, 184, 0.12)" }}
+                        content={
+                          <ChartTooltipContent
+                            valueFormatter={(value) => formatNumber(value)}
+                          />
+                        }
+                      />
+                      <Bar dataKey="total" radius={[10, 10, 0, 0]}>
+                        {statusChartRows.map((entry) => (
+                          <Cell key={entry.status} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ChartContainer>
+                </div>
               </article>
 
               <article className="card chart">

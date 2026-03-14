@@ -287,13 +287,16 @@ code {
 }
 
 .sidebar-footer {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
   text-align: center;
   margin-top: auto;
-  font-size: 0.75rem;
+  font-size: 0.55rem;
   font-weight: 600;
   color: var(--text-muted);
   overflow: hidden;
-  max-height: 64px;
+  max-height: 132px;
   opacity: 1;
   transform: translateY(0);
   transition:
@@ -501,6 +504,14 @@ code {
 .panorama-grid .card.chart.wide {
   min-height: 420px;
   height: 100%;
+}
+
+.sidebar-footer-mark {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  object-fit: contain;
 }
 
 .panorama-grid .card.chart.wide .plot {
@@ -919,6 +930,12 @@ code {
 }
 
 .phase-chart-scroll-shell {
+  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.status-chart-scroll-shell {
   width: 100%;
   flex: 1 1 auto;
   min-width: 0;
@@ -1535,6 +1552,15 @@ td {
   }
   .phase-chart-scroll-content {
     min-width: 560px;
+  }
+  .status-chart-scroll-shell {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable both-edges;
+  }
+  .status-chart-scroll-content {
+    min-width: 380px;
   }
   .grid {
     grid-template-columns: 1fr;
