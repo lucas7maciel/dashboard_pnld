@@ -880,48 +880,52 @@ export default function App() {
                   <h3>Cronograma</h3>
                   <InfoTooltip text='Status = contagem de status da aba "Status Cronograma".' />
                 </div>
-                <ChartContainer
-                  className="plot plot-fade-in"
-                  config={cronogramaChartConfig}
-                >
-                  <PieChart
-                    margin={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                <div className="plot plot-fade-in cronograma-chart-layout">
+                  <ChartContainer
+                    className="cronograma-chart-canvas"
+                    config={cronogramaChartConfig}
                   >
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          hideLabel
-                          valueFormatter={(value) =>
-                            `${formatNumber(value)} atividades`
-                          }
-                        />
-                      }
-                    />
-                    <Pie
-                      data={cronogramaDonutRows}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius="58%"
-                      outerRadius="82%"
-                      paddingAngle={3}
-                      strokeWidth={0}
-                      label={({ percent }) =>
-                        percent ? `${Math.round(percent * 100)}%` : ""
-                      }
-                      labelLine={false}
-                    >
-                      {cronogramaDonutRows.map((entry) => (
-                        <Cell key={entry.name} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <ChartLegend
-                      verticalAlign="middle"
-                      align="right"
-                      layout="vertical"
-                      content={<ChartLegendContent />}
-                    />
-                  </PieChart>
-                </ChartContainer>
+                    <PieChart margin={{ top: 12, right: 12, bottom: 12, left: 12 }}>
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            hideLabel
+                            valueFormatter={(value) =>
+                              `${formatNumber(value)} atividades`
+                            }
+                          />
+                        }
+                      />
+                      <Pie
+                        data={cronogramaDonutRows}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="58%"
+                        outerRadius="82%"
+                        paddingAngle={3}
+                        strokeWidth={0}
+                        label={({ percent }) =>
+                          percent >= 0.08 ? `${Math.round(percent * 100)}%` : ""
+                        }
+                        labelLine={false}
+                      >
+                        {cronogramaDonutRows.map((entry) => (
+                          <Cell key={entry.name} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ChartContainer>
+                  <div className="chart-legend cronograma-chart-legend" aria-label="Legenda do cronograma">
+                    {cronogramaDonutRows.map((entry) => (
+                      <div key={entry.name} className="chart-legend-item">
+                        <span className="chart-legend-dot" style={{ backgroundColor: entry.fill }} />
+                        <span>{entry.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </article>
 
               <article className="card chart wide">
