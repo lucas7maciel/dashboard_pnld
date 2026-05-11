@@ -4,111 +4,48 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
   XAxis,
   YAxis,
 } from "recharts";
 import {
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "./components/ui/chart.jsx";
+import GanttChart from "./components/GanttChart.jsx";
 
 const CHART_FONT_FAMILY = "Nunito, sans-serif";
 const THEME_STORAGE_KEY = "pnld-dashboard-theme";
 const FALLBACK_TEXT = "-";
 const PUBLIC_BASE_URL = import.meta.env.BASE_URL;
-const FALLBACK_CRONOGRAMA = {
-  status_contagem: {
-    FINALIZADO: 9,
-    "EM ANDAMENTO": 7,
-    SUSPENSO: 3,
-    "SEM DADOS": 4,
-  },
-  atividades_suspensas: [
-    {
-      Objeto:
-        "PNLD EJA 2026-2029 - Objeto 01: Obras Didáticas destinadas à Educação de Jovens e Adultos (EJA)",
-      Atividade: "Validação documental complementar",
-      Status: "Suspenso",
-    },
-    {
-      Objeto:
-        "PNLD 2024-2027 - ANOS FINAIS - Objeto: 03 - Obras Literárias destinadas aos Anos Finais",
-      Atividade: "Revisão de parecer pedagógico",
-      Status: "Suspenso",
-    },
-    {
-      Objeto: "PNLD Educação Infantil 2026-2029 - Objeto 02",
-      Atividade: "Conferência de acessibilidade editorial",
-      Status: "Suspenso",
-    },
-  ],
-};
-const PHASES_ORDER = [
-  "VALIDAÇÃO DE INSCRIÇÃO",
-  "AVALIAÇÃO PEDAGÓGICA",
-  "ANÁLISE DE ATRIBUTOS",
-  "ACESSIBILIDADE",
-  "INSUMOS DE QUALIFICAÇÃO",
+const API_URL =
+  "https://script.google.com/macros/s/AKfycbxwajnGtG-iPSmkr4u9LgKJvW4-FbjVbDefnuT8IdWjg4qJqkbCcMJC8PUT_1i9K-XL-Q/exec";
+
+const PHASE_KEYS = [
+  { key: "vi", consolidacaoKey: "validação de inscrição", label: "Validação de Inscrição", short: "VI", color: "#2F7DFA" },
+  { key: "ap", consolidacaoKey: "avaliação pedagogica", label: "Avaliação Pedagógica", short: "AP", color: "#DAD21D" },
+  { key: "at", consolidacaoKey: "analise de atributos", label: "Análise de Atributos", short: "Atrib", color: "#EFE777" },
+  { key: "ac", consolidacaoKey: "acessibilidade", label: "Acessibilidade", short: "Acess", color: "#B7AF18", opacity: 0.6 },
+  { key: "iq", consolidacaoKey: "insumos de qualificação", label: "Insumos de Qualificação", short: "Insumos", color: "#B7AF18" },
 ];
 
-const STATUS_TONE = {
-  CONCLUÍDO: "ok",
-  "EM ANDAMENTO": "andamento",
-  "SEM DADOS": "critico",
-  FINALIZADO: "ok",
-  SUSPENSO: "critico",
+const STATUS_LABELS = {
+  CONCLUIDO: "Concluído",
+  EM_ANDAMENTO: "Em andamento",
+  PENDENTE: "Pendente",
+  SUSPENSO: "Suspenso",
+  SEM_DADOS: "Sem dados",
 };
 
-const decodePossibleMojibake = (value) => {
-  if (typeof value !== "string") return value;
-  const text = value.trim();
-  if (!/[ÃÂâï]/.test(text)) return text;
+// ---------- helpers ----------
 
-  try {
-    const bytes = Uint8Array.from(text, (char) => char.charCodeAt(0) & 0xff);
-    const decoded = new TextDecoder("utf-8").decode(bytes).trim();
-    if (decoded && !decoded.includes("�")) return decoded;
-  } catch {
-    return text;
-  }
-
-  return text;
-};
-
-const sanitizeSnapshot = (value) => {
-  if (Array.isArray(value)) {
-    return value.map(sanitizeSnapshot);
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, innerValue]) => [
-        key,
-        sanitizeSnapshot(innerValue),
-      ]),
-    );
-  }
-
-  return decodePossibleMojibake(value);
-};
-
-const formatDisplayText = (value, fallback = FALLBACK_TEXT) => {
-  if (value === null || value === undefined || value === "") return fallback;
-  const text = decodePossibleMojibake(String(value).trim());
-  const lettersOnly = text.replace(/[^A-Za-zÀ-ÿ]+/g, "");
-
-  if (!lettersOnly) return text;
-  if (lettersOnly !== lettersOnly.toUpperCase()) return text;
-
-  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-};
+const slugify = (text) =>
+  String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 
 const formatNumber = (value) => {
   const numeric = Number(value);
@@ -122,121 +59,211 @@ const formatPercent = (value, digits = 1) => {
   return `${numeric.toFixed(digits)}%`;
 };
 
-const getPhaseIndex = (phase) => {
-  const normalized = decodePossibleMojibake(String(phase || "")).toUpperCase();
-  const index = PHASES_ORDER.indexOf(normalized);
-  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+const normalizeCellStatus = (raw) => {
+  if (raw === null || raw === undefined) return "sem dados";
+  const s = String(raw).trim().toLowerCase();
+  if (!s) return "sem dados";
+  if (s === "ok") return "ok";
+  if (s.includes("andamento")) return "em andamento";
+  if (s.includes("suspens")) return "suspenso";
+  if (s.includes("pendente")) return "pendente";
+  return "sem dados";
 };
 
-const getStatusTone = (label) => {
-  const normalized = decodePossibleMojibake(String(label || "")).toUpperCase();
-  return STATUS_TONE[normalized] || "andamento";
+const computeObjectStatus = (cellStatuses) => {
+  // cellStatuses: array of normalized status strings
+  const real = cellStatuses.filter((s) => s !== "sem dados");
+  if (real.length === 0) return "SEM_DADOS";
+  if (cellStatuses.includes("suspenso")) return "SUSPENSO";
+  if (cellStatuses.includes("em andamento")) return "EM_ANDAMENTO";
+  if (cellStatuses.includes("pendente")) return "PENDENTE";
+  if (real.every((s) => s === "ok") && real.length === PHASE_KEYS.length) return "CONCLUIDO";
+  // mixed ok with some sem dados → em andamento
+  return "EM_ANDAMENTO";
 };
 
-const getChartTheme = (theme) =>
-  theme === "light"
-    ? {
-        text: "#202124",
-        grid: "rgba(32, 33, 36, 0.16)",
-        hoverBg: "#FFFFFF",
-        hoverBorder: "rgba(218, 210, 29, 0.35)",
-        line: "#B7AF18",
-        lineMarkerStroke: "#F7FAF8",
-        status: ["#2F7DFA", "#DAD21D", "#D97706"],
-        pie: ["#B7AF18", "#EFE777", "#D97706", "#2F7DFA"],
-        bar: "#2F7DFA",
-      }
-    : {
-        text: "#F8F8FF",
-        grid: "rgba(255, 255, 255, 0.14)",
-        hoverBg: "#12081E",
-        hoverBorder: "rgba(218, 210, 29, 0.4)",
-        line: "#27A7F7",
-        lineMarkerStroke: "#0F0718",
-        status: ["#2F7DFA", "#DAD21D", "#D97706"],
-        pie: ["#2F7DFA", "#DAD21D", "#D97706", "#EFE777"],
-        bar: "#2F7DFA",
-      };
+const computeFaseAtual = (phases) => {
+  // first non-ok / non-sem-dados; otherwise last completed; else first
+  for (const p of phases) {
+    if (p.status === "em andamento" || p.status === "suspenso" || p.status === "pendente") return p.label;
+  }
+  // all ok or sem dados
+  const lastOk = [...phases].reverse().find((p) => p.status === "ok");
+  if (lastOk) return lastOk.label;
+  return PHASE_KEYS[0].label;
+};
 
-const formatPhaseAxisLabel = (phase) => {
-  const labels = {
-    "VALIDAÇÃO DE INSCRIÇÃO": "Validação de\nInscrição",
-    "AVALIAÇÃO PEDAGÓGICA": "Avaliação\nPedagógica",
-    "ANÁLISE DE ATRIBUTOS": "Análise de\nAtributos",
-    ACESSIBILIDADE: "Acessibilidade",
-    "INSUMOS DE QUALIFICAÇÃO": "Insumos de\nQualificação",
+// ---------- transform ----------
+
+const transformToSnapshot = (raw) => {
+  const consolidacao = Array.isArray(raw?.consolidacao) ? raw.consolidacao : [];
+  const ap2 = Array.isArray(raw?.avaliacao_pedagogica_2) ? raw.avaliacao_pedagogica_2 : [];
+  const acess = Array.isArray(raw?.acessibilidade) ? raw.acessibilidade : [];
+  const insumos = Array.isArray(raw?.insumos_qualificacao) ? raw.insumos_qualificacao : [];
+  const atributos = Array.isArray(raw?.analise_atributos) ? raw.analise_atributos : [];
+
+  const matchKey = (edital, objeto) => `${String(edital || "").trim()}|${String(objeto || "").trim()}`;
+  const findIn = (arr, edital, objeto) =>
+    arr.find((r) => matchKey(r.Edital, r.Objeto) === matchKey(edital, objeto)) || null;
+
+  const objetos = consolidacao.map((row) => {
+    const edital = row.Edital;
+    const objeto = row.Objeto;
+    const tipo = row.Tipo;
+    const id = slugify(`${edital}-${objeto}`);
+
+    const phases = PHASE_KEYS.map((p) => ({
+      key: p.key,
+      label: p.label,
+      short: p.short,
+      status: normalizeCellStatus(row[p.consolidacaoKey]),
+    }));
+
+    const statusKey = computeObjectStatus(phases.map((p) => p.status));
+    const faseAtual = computeFaseAtual(phases);
+
+    const ap2Row = findIn(ap2, edital, objeto);
+    const acessRow = findIn(acess, edital, objeto);
+    const insumosRow = findIn(insumos, edital, objeto);
+    const atribRow = findIn(atributos, edital, objeto);
+
+    const inscritas = Number(ap2Row?.["Coleções incritas"]) || null;
+    const validadas = Number(ap2Row?.["Coleções validadas"]) || null;
+    const aprovadas = Number(ap2Row?.["Coleções Aprovadas"]) || null;
+    const reprovadas = Number(ap2Row?.["Coleções Reprovadas"]) || null;
+    const avaliadores = Number(ap2Row?.["Quantidade de avaliadores envolvidos"]) || null;
+    const taxa =
+      Number.isFinite(aprovadas) && Number.isFinite(validadas) && validadas > 0
+        ? aprovadas / validadas
+        : null;
+
+    return {
+      id,
+      edital,
+      objeto,
+      tipo,
+      nome: `${edital} — ${objeto}`,
+      status: statusKey,
+      statusLabel: STATUS_LABELS[statusKey],
+      faseAtual,
+      phases,
+      ap: {
+        inscritas,
+        validadas,
+        aprovadas,
+        reprovadas,
+        avaliadores,
+        inicio: ap2Row?.["Início"] || null,
+        termino: ap2Row?.["Término"] || null,
+        taxa,
+      },
+      acessibilidade: {
+        inicio: acessRow?.["Data de início da fase"] || null,
+        fim: acessRow?.["Data de fim da fase"] || null,
+        previsaoInicio: acessRow?.["Previsão de Início"] || null,
+        previsaoFim: acessRow?.["Previsão de Fim"] || null,
+      },
+      insumos: {
+        inicio: insumosRow?.["Data de início da fase"] || null,
+        fim: insumosRow?.["Data de fim da fase"] || null,
+        previsaoInicio: insumosRow?.["Previsão de Início"] || null,
+        previsaoFim: insumosRow?.["Previsão de Fim"] || null,
+      },
+      atributos: {
+        inicio: atribRow?.["Data de início da fase"] || null,
+        fim: atribRow?.["Data de fim da fase"] || null,
+      },
+    };
+  });
+
+  // resumo
+  const counts = { CONCLUIDO: 0, EM_ANDAMENTO: 0, PENDENTE: 0, SUSPENSO: 0, SEM_DADOS: 0 };
+  objetos.forEach((o) => {
+    counts[o.status]++;
+  });
+  const total = objetos.length;
+  const resumo = {
+    total_objetos: total,
+    concluidos: counts.CONCLUIDO,
+    em_andamento: counts.EM_ANDAMENTO,
+    pendentes: counts.PENDENTE,
+    em_risco: counts.SUSPENSO,
+    sem_dados: counts.SEM_DADOS,
+    percentual_concluido: total > 0 ? (counts.CONCLUIDO / total) * 100 : 0,
   };
 
-  const normalized = decodePossibleMojibake(String(phase || "")).toUpperCase();
-  return labels[normalized] || formatDisplayText(normalized);
-};
-
-const fetchSnapshot = async () => {
-  const response = await fetch(`${PUBLIC_BASE_URL}snapshot.json`, {
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new Error("Snapshot não encontrado");
-  }
-
-  const json = await response.json();
-  return sanitizeSnapshot(json);
-};
-
-const getStatusCounts = (items = []) => {
-  const counts = {};
-  items.forEach((item) => {
-    const status = decodePossibleMojibake(
-      item.status_objeto || "SEM DADOS",
-    ).toUpperCase();
-    counts[status] = (counts[status] || 0) + 1;
-  });
-  return counts;
-};
-
-const getPhaseKpis = (phases = []) =>
-  phases.map((phase) => ({
-    fase: decodePossibleMojibake(phase.fase || ""),
-    entrada: Number(phase.colecoes_entrada) || 0,
-    aprovadas: Number(phase.colecoes_aprovadas) || 0,
-    invalidadas: Number(phase.colecoes_invalidadas_desclassificadas) || 0,
-    taxaAprovacao: Number(phase.taxa_aprovacao),
-  }));
-
-const getRiskRanking = (objects = []) =>
-  [...objects]
-    .map((item) => ({
-      ...item,
-      taxaAprovacao: Number(item?.kpis?.taxa_aprovacao),
-    }))
-    .sort((left, right) => {
-      const leftRate = Number.isFinite(left.taxaAprovacao)
-        ? left.taxaAprovacao
-        : Infinity;
-      const rightRate = Number.isFinite(right.taxaAprovacao)
-        ? right.taxaAprovacao
-        : Infinity;
-      return leftRate - rightRate;
-    });
-
-const getHighlights = (objects = []) =>
-  [...objects].sort((left, right) => {
-    const leftIndex = getPhaseIndex(left.fase_atual);
-    const rightIndex = getPhaseIndex(right.fase_atual);
-
-    if (leftIndex !== rightIndex) return rightIndex - leftIndex;
-
-    const leftApproval = Number(left?.kpis?.colecoes_aprovadas) || 0;
-    const rightApproval = Number(right?.kpis?.colecoes_aprovadas) || 0;
-    return rightApproval - leftApproval;
-  });
-
-const extractApprovedCount = (text) => {
-  const match = decodePossibleMojibake(String(text || "")).match(
-    /(\d+)\s+coleç(?:ões|ao|ões)/i,
+  // KPIs por fase (aggregate from AP2 — only AP has real data)
+  const apTotals = objetos.reduce(
+    (acc, o) => {
+      acc.aprovadas += Number(o.ap.aprovadas) || 0;
+      acc.validadas += Number(o.ap.validadas) || 0;
+      acc.reprovadas += Number(o.ap.reprovadas) || 0;
+      acc.invalidadas += Math.max(
+        (Number(o.ap.inscritas) || 0) - (Number(o.ap.validadas) || 0),
+        0,
+      );
+      return acc;
+    },
+    { aprovadas: 0, validadas: 0, reprovadas: 0, invalidadas: 0 },
   );
-  return match ? Number(match[1]) : null;
+
+  const kpisPorFase = PHASE_KEYS.map((p) => {
+    const okCount = objetos.filter((o) => o.phases.find((x) => x.key === p.key)?.status === "ok").length;
+    return {
+      fase: p.label,
+      short: p.short,
+      color: p.color,
+      ok: okCount,
+      total,
+      taxa: total > 0 ? (okCount / total) * 100 : 0,
+    };
+  });
+
+  // Alertas
+  const alertas = [];
+  objetos.forEach((o) => {
+    if (o.phases.some((p) => p.status === "suspenso")) {
+      alertas.push({
+        id: `${o.id}-susp`,
+        tipo: "critico",
+        titulo: o.objeto,
+        descricao: `${o.edital} — fase suspensa`,
+      });
+    }
+  });
+  objetos.forEach((o) => {
+    if (o.phases.some((p) => p.status === "pendente")) {
+      alertas.push({
+        id: `${o.id}-pend`,
+        tipo: "andamento",
+        titulo: o.objeto,
+        descricao: `${o.edital} — fase pendente`,
+      });
+    }
+  });
+  objetos.forEach((o) => {
+    const ap = o.phases.find((p) => p.key === "ap");
+    if (ap?.status === "em andamento") {
+      alertas.push({
+        id: `${o.id}-ap`,
+        tipo: "info",
+        titulo: o.objeto,
+        descricao: `${o.edital} — Avaliação Pedagógica em andamento`,
+      });
+    }
+  });
+
+  return {
+    metadata: raw?.metadata || {},
+    resumo_executivo: resumo,
+    objetos,
+    kpis_por_fase: kpisPorFase,
+    ap_totais: apTotals,
+    alertas,
+  };
 };
+
+// ---------- icons (kept) ----------
 
 const Icon = ({ children }) => (
   <svg
@@ -259,7 +286,6 @@ const PanoramaIcon = () => (
     <path d="M5 10v10h14V10" />
   </Icon>
 );
-
 const ObjetosIcon = () => (
   <Icon>
     <rect x="3" y="4" width="7" height="7" rx="1.5" />
@@ -268,7 +294,6 @@ const ObjetosIcon = () => (
     <rect x="14" y="14" width="7" height="7" rx="1.5" />
   </Icon>
 );
-
 const CronogramaIcon = () => (
   <Icon>
     <path d="M7 2v4" />
@@ -277,7 +302,6 @@ const CronogramaIcon = () => (
     <path d="M3 10h18" />
   </Icon>
 );
-
 const IndicadoresIcon = () => (
   <Icon>
     <path d="M4 20V10" />
@@ -286,7 +310,6 @@ const IndicadoresIcon = () => (
     <path d="M22 20v-11" />
   </Icon>
 );
-
 const ExploracaoIcon = () => (
   <Icon>
     <circle cx="11" cy="11" r="6" />
@@ -295,154 +318,119 @@ const ExploracaoIcon = () => (
 );
 
 const CollapseIcon = ({ collapsed }) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="toggle-icon"
-    aria-hidden="true"
-  >
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="toggle-icon" aria-hidden="true">
     <path d="M4 5h16v14H4z" />
     <path d="M9 5v14" />
-    {collapsed ? (
-      <path d="m14 12 3-3v6l-3-3Z" />
-    ) : (
-      <path d="m10 12 4-3v6l-4-3Z" />
-    )}
+    {collapsed ? <path d="m14 12 3-3v6l-3-3Z" /> : <path d="m10 12 4-3v6l-4-3Z" />}
   </svg>
 );
 
 const MenuIcon = ({ open }) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="toggle-icon"
-    aria-hidden="true"
-  >
-    {open ? (
-      <>
-        <path d="M6 6l12 12" />
-        <path d="M18 6 6 18" />
-      </>
-    ) : (
-      <>
-        <path d="M4 7h16" />
-        <path d="M4 12h16" />
-        <path d="M4 17h16" />
-      </>
-    )}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="toggle-icon" aria-hidden="true">
+    {open ? (<><path d="M6 6l12 12" /><path d="M18 6 6 18" /></>) : (<><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>)}
   </svg>
 );
 
 const SunIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="theme-icon"
-    aria-hidden="true"
-  >
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="theme-icon" aria-hidden="true">
     <circle cx="12" cy="12" r="4.5" />
-    <path d="M12 2.5v2.5" />
-    <path d="M12 19v2.5" />
-    <path d="m4.9 4.9 1.8 1.8" />
-    <path d="m17.3 17.3 1.8 1.8" />
-    <path d="M2.5 12H5" />
-    <path d="M19 12h2.5" />
-    <path d="m4.9 19.1 1.8-1.8" />
-    <path d="m17.3 6.7 1.8-1.8" />
+    <path d="M12 2.5v2.5" /><path d="M12 19v2.5" /><path d="m4.9 4.9 1.8 1.8" /><path d="m17.3 17.3 1.8 1.8" /><path d="M2.5 12H5" /><path d="M19 12h2.5" /><path d="m4.9 19.1 1.8-1.8" /><path d="m17.3 6.7 1.8-1.8" />
   </svg>
 );
 
 const MoonIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="theme-icon"
-    aria-hidden="true"
-  >
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="theme-icon" aria-hidden="true">
     <path d="M20 14.5A7.5 7.5 0 1 1 9.5 4 6.2 6.2 0 0 0 20 14.5Z" />
   </svg>
 );
 
 const InfoIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="info-icon"
-    aria-hidden="true"
-  >
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="info-icon" aria-hidden="true">
     <circle cx="12" cy="12" r="9" />
     <path d="M12 10v6" />
     <path d="M12 7h.01" />
   </svg>
 );
 
-const StatusBadge = ({ label, tone }) => (
-  <span className={`badge badge-${tone}`}>{formatDisplayText(label)}</span>
-);
+// ---------- UI primitives ----------
+
+const STATUS_TONE_CLASS = {
+  CONCLUIDO: "ok",
+  EM_ANDAMENTO: "andamento",
+  PENDENTE: "pendente",
+  SUSPENSO: "critico",
+  SEM_DADOS: "muted",
+};
+
+const StatusBadge = ({ statusKey, label }) => {
+  const tone = STATUS_TONE_CLASS[statusKey] || "muted";
+  return <span className={`badge badge-${tone}`}>{label || STATUS_LABELS[statusKey] || "—"}</span>;
+};
 
 const InfoTooltip = ({ text }) => (
   <span className="info-tooltip">
-    <button
-      type="button"
-      className="info-tooltip-trigger"
-      aria-label={text}
-      title={text}
-    >
+    <button type="button" className="info-tooltip-trigger" aria-label={text} title={text}>
       <InfoIcon />
     </button>
-    <span className="info-tooltip-content" role="tooltip">
-      {text}
-    </span>
+    <span className="info-tooltip-content" role="tooltip">{text}</span>
   </span>
 );
 
-const MultilineAxisTick = ({ x, y, payload, color }) => {
-  const lines = String(payload?.value || "").split("\n");
+// ---------- Heatmap ----------
 
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text
-        x={0}
-        y={0}
-        dy={24}
-        textAnchor="middle"
-        fill={color}
-        fontFamily={CHART_FONT_FAMILY}
-        fontSize={13}
-      >
-        {lines.map((line, index) => (
-          <tspan
-            key={`${payload?.value}-${index}`}
-            x={0}
-            dy={index === 0 ? 0 : 16}
-          >
-            {line}
-          </tspan>
-        ))}
-      </text>
-    </g>
-  );
+const HEATMAP_CELL_CLASS = {
+  ok: "heatcell heatcell-ok",
+  "em andamento": "heatcell heatcell-info",
+  pendente: "heatcell heatcell-warning",
+  suspenso: "heatcell heatcell-danger",
+  "sem dados": "heatcell heatcell-muted",
 };
+
+const HEATMAP_CELL_LABEL = {
+  ok: "OK",
+  "em andamento": "Em andamento",
+  pendente: "Pendente",
+  suspenso: "Suspenso",
+  "sem dados": "Sem dados",
+};
+
+const HeatmapTable = ({ objetos }) => (
+  <div className="heatmap-shell">
+    <table className="heatmap">
+      <thead>
+        <tr>
+          <th className="heatmap-th-objeto">Objeto</th>
+          {PHASE_KEYS.map((p) => (
+            <th key={p.key} title={p.label}>{p.short}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {objetos.map((o) => {
+          const hasNonOk = o.phases.some((p) => p.status !== "ok" && p.status !== "sem dados");
+          return (
+            <tr key={o.id}>
+              <td className={`heatmap-name${hasNonOk ? " heatmap-name-active" : ""}`}>
+                <strong>{o.objeto}</strong>
+                <span className="heatmap-edital">{o.edital}</span>
+              </td>
+              {o.phases.map((p) => (
+                <td key={p.key} className="heatmap-cell-td">
+                  <span className={HEATMAP_CELL_CLASS[p.status]} title={`${p.label}: ${HEATMAP_CELL_LABEL[p.status]}`}>
+                    {HEATMAP_CELL_LABEL[p.status]}
+                  </span>
+                </td>
+              ))}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+);
+
+// ---------- Gantt removed (now in components/GanttChart.jsx) ----------
+// ---------- App ----------
 
 export default function App() {
   const [snapshot, setSnapshot] = useState(null);
@@ -457,16 +445,17 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-
-    fetchSnapshot()
-      .then((data) => {
-        if (!cancelled) setSnapshot(data);
+    fetch(API_URL, { cache: "no-store" })
+      .then((r) => {
+        if (!r.ok) throw new Error("Erro ao buscar dados da API");
+        return r.json();
       })
-      .catch((fetchError) => {
-        if (!cancelled)
-          setError(fetchError.message || "Erro ao carregar snapshot");
+      .then((raw) => {
+        if (!cancelled) setSnapshot(transformToSnapshot(raw));
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || "Erro ao carregar dados");
       });
-
     return () => {
       cancelled = true;
     };
@@ -475,16 +464,9 @@ export default function App() {
   useEffect(() => {
     const syncFromHash = () => {
       const hash = window.location.hash.replace("#", "").trim().toLowerCase();
-      const allowedTabs = [
-        "panorama",
-        "objetos",
-        "cronograma",
-        "indicadores",
-        "exploracao",
-      ];
-      setActiveTab(allowedTabs.includes(hash) ? hash : "panorama");
+      const allowed = ["panorama", "objetos", "cronograma", "indicadores", "exploracao"];
+      setActiveTab(allowed.includes(hash) ? hash : "panorama");
     };
-
     syncFromHash();
     window.addEventListener("hashchange", syncFromHash);
     return () => window.removeEventListener("hashchange", syncFromHash);
@@ -496,39 +478,12 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 900px)");
-    const handleChange = (event) => {
-      if (!event.matches) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-
-    handleChange(mediaQuery);
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
+    const mq = window.matchMedia("(max-width: 900px)");
+    const handler = (e) => { if (!e.matches) setIsMobileMenuOpen(false); };
+    handler(mq);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
   }, []);
-
-  const resumo = snapshot?.resumo_executivo ?? {};
-  const objetos = snapshot?.objetos ?? [];
-  const cronograma = useMemo(() => {
-    const rawCronograma = snapshot?.cronograma ?? {};
-    const statusContagem = rawCronograma.status_contagem || {};
-    const atividadesSuspensas = rawCronograma.atividades_suspensas || [];
-
-    return {
-      ...rawCronograma,
-      status_contagem: Object.keys(statusContagem).length
-        ? statusContagem
-        : FALLBACK_CRONOGRAMA.status_contagem,
-      atividades_suspensas: atividadesSuspensas.length
-        ? atividadesSuspensas
-        : FALLBACK_CRONOGRAMA.atividades_suspensas,
-    };
-  }, [snapshot]);
-  const kpisPorFase = snapshot?.kpis_por_fase ?? [];
-  const nextObject = resumo?.proximo_objeto ?? null;
-
-  const chartTheme = useMemo(() => getChartTheme(theme), [theme]);
 
   const navItems = useMemo(
     () => [
@@ -541,111 +496,97 @@ export default function App() {
     [],
   );
 
-  const statusCounts = useMemo(() => getStatusCounts(objetos), [objetos]);
-  const phaseKpis = useMemo(() => getPhaseKpis(kpisPorFase), [kpisPorFase]);
-  const highlights = useMemo(() => getHighlights(objetos), [objetos]);
-  const riskRanking = useMemo(() => getRiskRanking(objetos), [objetos]);
+  // Heatmap filter
+  const [heatmapFilter, setHeatmapFilter] = useState("andamento");
 
-  const nextObjectApprovedCount = useMemo(() => {
-    const fromReason = extractApprovedCount(nextObject?.motivo);
-    if (Number.isFinite(fromReason)) return fromReason;
-    const match = objetos.find((item) => item.id === nextObject?.id);
-    return Number(match?.kpis?.colecoes_aprovadas) || 0;
-  }, [nextObject, objetos]);
+  // Cronograma collapse state
+  const [collapsedEditals, setCollapsedEditals] = useState(new Set());
+  const toggleEdital = (id) => {
+    setCollapsedEditals((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
-  const statusChartRows = useMemo(
+  // Exploração filters
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterEdital, setFilterEdital] = useState("");
+
+  // Objetos filters
+  const [objetosStatusFilter, setObjetosStatusFilter] = useState('todos');
+  const [objetosTipoFilter, setObjetosTipoFilter] = useState('');
+  const [objetosFaseFilter, setObjetosFaseFilter] = useState('');
+
+  const objetos = snapshot?.objetos ?? [];
+
+  const objetosOrdered = useMemo(() => {
+    const order = { SUSPENSO: 0, PENDENTE: 1, EM_ANDAMENTO: 2, CONCLUIDO: 3, SEM_DADOS: 4 };
+    return [...objetos].sort((a, b) => order[a.status] - order[b.status]);
+  }, [objetos]);
+
+  const objetosTipos = useMemo(
+    () => Array.from(new Set(objetos.map((o) => o.tipo).filter(Boolean))),
+    [objetos],
+  );
+
+  const objetosFiltered = useMemo(() => {
+    const statusMap = {
+      andamento: 'EM_ANDAMENTO',
+      concluidos: 'CONCLUIDO',
+      pendentes: 'PENDENTE',
+      suspensos: 'SUSPENSO',
+    };
+    return objetosOrdered.filter((o) => {
+      if (objetosStatusFilter !== 'todos' && o.status !== statusMap[objetosStatusFilter]) return false;
+      if (objetosTipoFilter && o.tipo !== objetosTipoFilter) return false;
+      if (objetosFaseFilter && o.faseAtual !== objetosFaseFilter) return false;
+      return true;
+    });
+  }, [objetosOrdered, objetosStatusFilter, objetosTipoFilter, objetosFaseFilter]);
+
+  const editais = useMemo(() => Array.from(new Set(objetos.map((o) => o.edital))), [objetos]);
+
+  const heatmapObjetos = useMemo(() => {
+    if (heatmapFilter === "todos") return objetos;
+    return objetos.filter((o) => {
+      const allOk = o.phases.length === PHASE_KEYS.length && o.phases.every((p) => p.status === "ok");
+      return heatmapFilter === "concluidos" ? allOk : !allOk;
+    });
+  }, [objetos, heatmapFilter]);
+
+  const filteredExploracao = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return objetos.filter((o) => {
+      if (filterStatus && o.status !== filterStatus) return false;
+      if (filterEdital && o.edital !== filterEdital) return false;
+      if (!term) return true;
+      return (
+        o.edital.toLowerCase().includes(term) ||
+        o.objeto.toLowerCase().includes(term) ||
+        (o.tipo || "").toLowerCase().includes(term)
+      );
+    });
+  }, [objetos, searchTerm, filterStatus, filterEdital]);
+
+  const riskRanking = useMemo(
     () =>
-      Object.entries(statusCounts).map(([status, count], index) => ({
-        status: formatDisplayText(status),
-        total: count,
-        fill: chartTheme.status[index % chartTheme.status.length],
-      })),
-    [statusCounts, chartTheme],
+      objetos
+        .filter((o) => o.status !== "SEM_DADOS" && Number.isFinite(o.ap.taxa))
+        .sort((a, b) => a.ap.taxa - b.ap.taxa),
+    [objetos],
   );
 
-  const cronogramaStatusEntries = useMemo(
-    () => Object.entries(cronograma.status_contagem || {}),
-    [cronograma.status_contagem],
-  );
-
-  const cronogramaDonutRows = useMemo(
-    () =>
-      cronogramaStatusEntries.map(([label, count], index) => ({
-        name: formatDisplayText(label),
-        value: count,
-        fill: chartTheme.pie[index % chartTheme.pie.length],
-      })),
-    [cronogramaStatusEntries, chartTheme],
-  );
-
-  const phaseChartRows = useMemo(
-    () =>
-      phaseKpis.map((item) => ({
-        fase: formatPhaseAxisLabel(item.fase),
-        entrada: item.entrada,
-        aprovadas: item.aprovadas,
-        invalidadas: item.invalidadas,
-      })),
-    [phaseKpis],
-  );
-
-  const cronogramaBarRows = useMemo(
-    () =>
-      cronogramaStatusEntries.map(([label, count]) => ({
-        status: formatDisplayText(label),
-        total: count,
-      })),
-    [cronogramaStatusEntries],
-  );
-
-  const approvalByPhaseRows = useMemo(
-    () =>
-      phaseKpis.map((item) => ({
-        fase: formatDisplayText(item.fase),
-        aprovacao: Number.isFinite(item.taxaAprovacao)
-          ? item.taxaAprovacao * 100
-          : null,
-      })),
-    [phaseKpis],
-  );
-
-  const statusChartConfig = useMemo(
-    () => ({ total: { label: "Objetos" } }),
-    [],
-  );
-
-  const cronogramaChartConfig = useMemo(
-    () => ({ total: { label: "Atividades" } }),
-    [],
-  );
-
-  const phaseChartConfig = useMemo(
-    () => ({
-      invalidadas: { label: "Invalidadas", color: "#DAD21D" },
-      aprovadas: { label: "Aprovadas", color: "#FF8B1A" },
-      entrada: { label: "Entrada", color: "#4A8CCA" },
-    }),
-    [],
-  );
-
-  const approvalChartConfig = useMemo(
-    () => ({
-      aprovacao: { label: "Taxa de aprovação", color: chartTheme.line },
-    }),
-    [chartTheme.line],
-  );
-
-  const logoTextSrc =
-    theme === "light"
-      ? `${PUBLIC_BASE_URL}logo_text.svg`
-      : `${PUBLIC_BASE_URL}logo_text_dark.svg`;
+  const logoTextSrc = theme === "light"
+    ? `${PUBLIC_BASE_URL}logo_text.svg`
+    : `${PUBLIC_BASE_URL}logo_text_dark.svg`;
 
   if (error) {
     return (
       <div className="page error">
-        <div>
-          <h1>{error}</h1>
-        </div>
+        <div><h1>{error}</h1></div>
       </div>
     );
   }
@@ -658,31 +599,41 @@ export default function App() {
     );
   }
 
+  const resumo = snapshot.resumo_executivo;
+  const alertas = snapshot.alertas;
+  const kpisPorFase = snapshot.kpis_por_fase;
+  const apTotais = snapshot.ap_totais;
+
+  const exportCSV = () => {
+    const headers = ["Edital", "Objeto", "Tipo", "VI", "AP", "Atrib", "Acess", "IQ", "Aprov.AP %", "Avaliadores"];
+    const rows = filteredExploracao.map((o) => [
+      o.edital, o.objeto, o.tipo,
+      ...PHASE_KEYS.map((p) => HEATMAP_CELL_LABEL[o.phases.find((x) => x.key === p.key).status]),
+      o.ap.taxa != null ? (o.ap.taxa * 100).toFixed(1) : "",
+      o.ap.avaliadores ?? "",
+    ]);
+    const csv = [headers, ...rows]
+      .map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pnld-objetos.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const kpiBarData = kpisPorFase.map((k) => ({ fase: k.short, ok: k.ok, fill: k.color }));
+
   return (
-    <div
-      className={`app${isSidebarCollapsed ? " sidebar-collapsed" : ""}${isMobileMenuOpen ? " mobile-menu-open" : ""}`}
-    >
-      <button
-        type="button"
-        className="sidebar-backdrop"
-        aria-label="Fechar menu"
-        onClick={() => setIsMobileMenuOpen(false)}
-      />
-      <aside
-        className={`sidebar${isSidebarCollapsed ? " collapsed" : ""}${isMobileMenuOpen ? " mobile-open" : ""}`}
-      >
+    <div className={`app${isSidebarCollapsed ? " sidebar-collapsed" : ""}${isMobileMenuOpen ? " mobile-menu-open" : ""}`}>
+      <button type="button" className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setIsMobileMenuOpen(false)} />
+      <aside className={`sidebar${isSidebarCollapsed ? " collapsed" : ""}${isMobileMenuOpen ? " mobile-open" : ""}`}>
         <div className="sidebar-header">
           <div className="brand">
-            <img
-              src={`${PUBLIC_BASE_URL}logo_icon.svg`}
-              alt="PNLD"
-              className="brand-logo brand-logo-icon"
-            />
-            <img
-              src={logoTextSrc}
-              alt="PNLD"
-              className="brand-logo brand-logo-text"
-            />
+            <img src={`${PUBLIC_BASE_URL}logo_icon.svg`} alt="PNLD" className="brand-logo brand-logo-icon" />
+            <img src={logoTextSrc} alt="PNLD" className="brand-logo brand-logo-text" />
           </div>
         </div>
 
@@ -705,11 +656,7 @@ export default function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <img
-            src={`${PUBLIC_BASE_URL}PNLD_TRINCA_preview.png`}
-            alt="PNLD Trinca"
-            className="sidebar-footer-mark"
-          />
+          <img src={`${PUBLIC_BASE_URL}PNLD_TRINCA_preview.png`} alt="PNLD Trinca" className="sidebar-footer-mark" />
           <p>Portfólio de Projetos do PNLD - NEES/UFAL | 2026</p>
         </div>
       </aside>
@@ -717,42 +664,16 @@ export default function App() {
       <main className="content">
         <header className="topbar">
           <div className="topbar-title">
-            <button
-              type="button"
-              className="sidebar-toggle mobile-nav-toggle"
-              onClick={() => setIsMobileMenuOpen((current) => !current)}
-              aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
-              aria-expanded={isMobileMenuOpen}
-              aria-controls="sidebar-navigation"
-            >
+            <button type="button" className="sidebar-toggle mobile-nav-toggle" onClick={() => setIsMobileMenuOpen((c) => !c)} aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={isMobileMenuOpen} aria-controls="sidebar-navigation">
               <MenuIcon open={isMobileMenuOpen} />
             </button>
-            <button
-              type="button"
-              className="sidebar-toggle topbar-toggle"
-              onClick={() => setIsSidebarCollapsed((current) => !current)}
-              aria-label={
-                isSidebarCollapsed ? "Maximizar sidebar" : "Minimizar sidebar"
-              }
-            >
+            <button type="button" className="sidebar-toggle topbar-toggle" onClick={() => setIsSidebarCollapsed((c) => !c)} aria-label={isSidebarCollapsed ? "Maximizar sidebar" : "Minimizar sidebar"}>
               <CollapseIcon collapsed={isSidebarCollapsed} />
             </button>
             <h1>Dashboard</h1>
           </div>
 
-          <button
-            type="button"
-            className="theme-toggle"
-            onClick={() =>
-              setTheme((current) => (current === "light" ? "dark" : "light"))
-            }
-            aria-label={
-              theme === "light" ? "Ativar tema escuro" : "Ativar tema claro"
-            }
-            title={
-              theme === "light" ? "Ativar tema escuro" : "Ativar tema claro"
-            }
-          >
+          <button type="button" className="theme-toggle" onClick={() => setTheme((c) => (c === "light" ? "dark" : "light"))} aria-label={theme === "light" ? "Ativar tema escuro" : "Ativar tema claro"} title={theme === "light" ? "Ativar tema escuro" : "Ativar tema claro"}>
             {theme === "light" ? <MoonIcon /> : <SunIcon />}
           </button>
         </header>
@@ -761,322 +682,170 @@ export default function App() {
           <>
             <section className="panorama-metrics">
               <article className="card metric">
-                <div className="metric-header">
-                  <h3>Total Objetos</h3>
-                  <InfoTooltip text="Total de objetos disponíveis no snapshot." />
-                </div>
+                <div className="metric-header"><h3>Total Objetos</h3><InfoTooltip text="Total de objetos da consolidação." /></div>
                 <h2>{formatNumber(resumo.total_objetos)}</h2>
               </article>
-
               <article className="card metric">
-                <div className="metric-header">
-                  <h3>Concluídos</h3>
-                  <InfoTooltip text="Objetos com fase de qualificação finalizada." />
-                </div>
+                <div className="metric-header"><h3>Concluídos</h3><InfoTooltip text="Objetos com todas as fases finalizadas." /></div>
                 <h2>{formatNumber(resumo.concluidos)}</h2>
+                <p className="metric-sub">{formatPercent(resumo.percentual_concluido)} do total</p>
               </article>
-
               <article className="card metric">
-                <div className="metric-header">
-                  <h3>Em andamento</h3>
-                  <InfoTooltip text="Objetos com alguma fase iniciada e sem conclusão final." />
-                </div>
+                <div className="metric-header"><h3>Em andamento</h3><InfoTooltip text="Objetos com pelo menos uma fase em execução." /></div>
                 <h2>{formatNumber(resumo.em_andamento)}</h2>
               </article>
-
               <article className="card metric">
-                <div className="metric-header">
-                  <h3>Concluído</h3>
-                  <InfoTooltip text="Percentual de objetos concluídos em relação ao total." />
-                </div>
-                <h2>{formatPercent(resumo.percentual_concluido)}</h2>
+                <div className="metric-header"><h3>Pendentes</h3><InfoTooltip text="Objetos com fases pendentes." /></div>
+                <h2>{formatNumber(resumo.pendentes)}</h2>
+              </article>
+              <article className="card metric">
+                <div className="metric-header"><h3>Em risco</h3><InfoTooltip text="Objetos com pelo menos uma fase suspensa." /></div>
+                <h2>{formatNumber(resumo.em_risco)}</h2>
               </article>
             </section>
-            <section className="grid panorama-grid">
-              <article className="card highlight">
+
+            <section className="panorama-main-grid">
+              <article className="card heatmap-card">
                 <div className="card-head">
-                  <div className="highlight-heading">
-                    <h3>Próximo Objeto</h3>
-                    <span className="highlight-eyebrow">Em foco</span>
-                  </div>
-                  <InfoTooltip text="Regra = fase mais inicial; desempate por maior volume aprovado." />
+                  <h3>Mapa objeto × fase</h3>
+                  <InfoTooltip text="Status de cada uma das 5 fases para os 17 objetos." />
                 </div>
-
-                <div className="highlight-body">
-                  <div className="highlight-main">
-                    <h2 className="title">
-                      {nextObject?.nome || FALLBACK_TEXT}
-                    </h2>
-                    <p className="highlight-summary">
-                      {nextObject?.motivo ||
-                        "Nenhum objeto definido como destaque no snapshot."}
-                    </p>
-                  </div>
-
-                  <div className="highlight-meta">
-                    <div className="highlight-pill">
-                      <span>Fase atual</span>
-                      <strong>
-                        {formatDisplayText(nextObject?.fase_atual)}
-                      </strong>
-                    </div>
-                    <div className="highlight-pill highlight-pill-accent">
-                      <span>Aprovadas</span>
-                      <strong>{formatNumber(nextObjectApprovedCount)}</strong>
-                    </div>
-                  </div>
-                </div>
-              </article>
-
-              <article className="card chart">
-                <div className="card-head">
-                  <h3>Status dos Objetos</h3>
-                  <InfoTooltip text="Legenda: Concluído, Em andamento e Sem dados." />
-                </div>
-                <div className="status-chart-scroll-shell">
-                  <ChartContainer
-                    className="plot plot-fade-in status-chart-scroll-content"
-                    config={statusChartConfig}
-                  >
-                    <BarChart
-                      data={statusChartRows}
-                      margin={{ top: 12, right: 12, bottom: 16, left: 12 }}
+                <div className="heatmap-filters">
+                  {[
+                    { id: "todos", label: "Todos" },
+                    { id: "andamento", label: "Em andamento" },
+                    { id: "concluidos", label: "Concluídos" },
+                  ].map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      className={`heatmap-chip${heatmapFilter === chip.id ? " active" : ""}`}
+                      onClick={() => setHeatmapFilter(chip.id)}
                     >
-                      <CartesianGrid vertical={false} stroke={chartTheme.grid} />
-                      <XAxis
-                        dataKey="status"
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{
-                          fill: chartTheme.text,
-                          fontFamily: CHART_FONT_FAMILY,
-                          fontSize: 13,
-                        }}
-                      />
-                      <YAxis
-                        allowDecimals={false}
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{
-                          fill: chartTheme.text,
-                          fontFamily: CHART_FONT_FAMILY,
-                          fontSize: 13,
-                        }}
-                      />
-                      <ChartTooltip
-                        cursor={{ fill: "rgba(148, 163, 184, 0.12)" }}
-                        content={
-                          <ChartTooltipContent
-                            valueFormatter={(value) => formatNumber(value)}
-                          />
-                        }
-                      />
-                      <Bar dataKey="total" radius={[10, 10, 0, 0]}>
-                        {statusChartRows.map((entry) => (
-                          <Cell key={entry.status} fill={entry.fill} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ChartContainer>
+                      {chip.label}
+                    </button>
+                  ))}
                 </div>
+                <HeatmapTable objetos={heatmapObjetos} />
               </article>
 
-              <article className="card chart">
+              <article className="card alerts-card">
                 <div className="card-head">
-                  <h3>Cronograma</h3>
-                  <InfoTooltip text='Status = contagem de status da aba "Status Cronograma".' />
+                  <h3>Alertas ativos</h3>
+                  <InfoTooltip text="Alertas gerados a partir das fases suspensas, pendentes e em andamento." />
                 </div>
-                <div className="plot plot-fade-in cronograma-chart-layout">
-                  <ChartContainer
-                    className="cronograma-chart-canvas"
-                    config={cronogramaChartConfig}
-                  >
-                    <PieChart margin={{ top: 12, right: 12, bottom: 12, left: 12 }}>
-                      <ChartTooltip
-                        content={
-                          <ChartTooltipContent
-                            hideLabel
-                            valueFormatter={(value) =>
-                              `${formatNumber(value)} atividades`
-                            }
-                          />
-                        }
-                      />
-                      <Pie
-                        data={cronogramaDonutRows}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius="58%"
-                        outerRadius="82%"
-                        paddingAngle={3}
-                        strokeWidth={0}
-                        label={({ percent }) =>
-                          percent >= 0.08 ? `${Math.round(percent * 100)}%` : ""
-                        }
-                        labelLine={false}
-                      >
-                        {cronogramaDonutRows.map((entry) => (
-                          <Cell key={entry.name} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ChartContainer>
-                  <div className="chart-legend cronograma-chart-legend" aria-label="Legenda do cronograma">
-                    {cronogramaDonutRows.map((entry) => (
-                      <div key={entry.name} className="chart-legend-item">
-                        <span className="chart-legend-dot" style={{ backgroundColor: entry.fill }} />
-                        <span>{entry.name}</span>
+                <ul className="alerts-list">
+                  {alertas.length === 0 && <li className="alert-empty">Nenhum alerta no momento.</li>}
+                  {alertas.map((a) => (
+                    <li key={a.id} className={`alert-item alert-${a.tipo}`}>
+                      <span className="alert-dot" />
+                      <div>
+                        <strong>{a.titulo}</strong>
+                        <span>{a.descricao}</span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </article>
-
-              <article className="card chart wide">
-                <div className="card-head">
-                  <h3>KPIs por fase</h3>
-                  <InfoTooltip text="Coleções por fase: entrada, aprovadas e invalidadas." />
-                </div>
-                <div className="phase-chart-scroll-shell">
-                  <ChartContainer
-                    className="plot plot-fade-in phase-chart-scroll-content"
-                    config={phaseChartConfig}
-                  >
-                    <BarChart
-                      data={phaseChartRows}
-                      margin={{ top: 14, right: 12, bottom: 0, left: 12 }}
-                    >
-                      <CartesianGrid vertical={false} stroke={chartTheme.grid} />
-                      <XAxis
-                        dataKey="fase"
-                        height={70}
-                        tickMargin={14}
-                        tickLine={false}
-                        axisLine={false}
-                        interval={0}
-                        tick={(props) => (
-                          <MultilineAxisTick {...props} color={chartTheme.text} />
-                        )}
-                      />
-                      <YAxis
-                        allowDecimals={false}
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{
-                          fill: chartTheme.text,
-                          fontFamily: CHART_FONT_FAMILY,
-                          fontSize: 13,
-                        }}
-                      />
-                      <ChartTooltip
-                        content={
-                          <ChartTooltipContent
-                            valueFormatter={(value) => formatNumber(value)}
-                          />
-                        }
-                      />
-                      <ChartLegend
-                        verticalAlign="top"
-                        align="right"
-                        wrapperStyle={{ top: 0 }}
-                        content={<ChartLegendContent />}
-                      />
-                      <Bar
-                        dataKey="invalidadas"
-                        stackId="phase"
-                        fill="var(--color-invalidadas)"
-                        radius={[0, 0, 6, 6]}
-                      />
-                      <Bar
-                        dataKey="aprovadas"
-                        stackId="phase"
-                        fill="var(--color-aprovadas)"
-                      />
-                      <Bar
-                        dataKey="entrada"
-                        stackId="phase"
-                        fill="var(--color-entrada)"
-                        radius={[6, 6, 0, 0]}
-                      />
-                    </BarChart>
-                  </ChartContainer>
-                </div>
+                    </li>
+                  ))}
+                </ul>
               </article>
             </section>
           </>
         )}
 
         {activeTab === "objetos" && (
-          <section className="grid full objetos-grid">
-            <article className="card objetos-fill">
+          <section className="objetos-main-grid">
+            <article className="card status-card">
               <div className="card-head">
-                <h3>Destaques</h3>
-                <InfoTooltip text="Destaques = objetos ordenados por fase atual." />
+                <h3>Status geral</h3>
+                <InfoTooltip text="Distribuição dos objetos por status." />
               </div>
-
-              <div className="detail-stack">
-                {highlights.map((item, index) => (
-                  <article
-                    key={item.id}
-                    className="detail-card detail-spotlight"
-                  >
-                    <div className="detail-rank">
-                      {String(index + 1).padStart(2, "0")}
-                    </div>
-                    <div className="detail-content">
-                      <strong>{item.nome}</strong>
-                      <span className="detail-phase">
-                        {formatDisplayText(item.fase_atual)}
-                      </span>
-                      <div className="detail-meta-row">
-                        <span className="detail-meta-label">Aprovadas</span>
-                        <span className="detail-meta-value">
-                          {formatNumber(item?.kpis?.colecoes_aprovadas)}
-                        </span>
-                      </div>
-                    </div>
-                  </article>
-                ))}
+              <div className="status-counters">
+                <div className="status-counter status-counter-ok">
+                  <span>Concluídos</span>
+                  <strong>{resumo.concluidos}</strong>
+                </div>
+                <div className="status-counter status-counter-info">
+                  <span>Em andamento</span>
+                  <strong>{resumo.em_andamento}</strong>
+                </div>
+                <div className="status-counter status-counter-warning">
+                  <span>Pendentes</span>
+                  <strong>{resumo.pendentes}</strong>
+                </div>
+                <div className="status-counter status-counter-danger">
+                  <span>Suspensos</span>
+                  <strong>{resumo.em_risco}</strong>
+                </div>
               </div>
             </article>
 
-            <article className="card full">
+            <article className="card">
               <div className="card-head">
                 <h3>Objetos</h3>
-                <InfoTooltip text="Aprovação = coleções aprovadas ÷ coleções de entrada × 100." />
+                <InfoTooltip text="Aprovação AP = Coleções aprovadas ÷ validadas × 100." />
               </div>
-
+              <div className="objetos-filters">
+                <div className="objetos-chips">
+                  {[
+                    { id: "todos", label: "Todos", tone: "" },
+                    { id: "andamento", label: "Em andamento", tone: "chip-info" },
+                    { id: "concluidos", label: "Concluídos", tone: "chip-brand" },
+                    { id: "pendentes", label: "Pendentes", tone: "chip-warning" },
+                    { id: "suspensos", label: "Suspensos", tone: "chip-danger" },
+                  ].map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      className={`heatmap-chip ${chip.tone}${objetosStatusFilter === chip.id ? " active" : ""}`}
+                      onClick={() => setObjetosStatusFilter(chip.id)}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+                <span className="objetos-filters-divider" />
+                <select
+                  className="objetos-select"
+                  value={objetosTipoFilter}
+                  onChange={(e) => setObjetosTipoFilter(e.target.value)}
+                >
+                  <option value="">Todos os tipos</option>
+                  {objetosTipos.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                <select
+                  className="objetos-select"
+                  value={objetosFaseFilter}
+                  onChange={(e) => setObjetosFaseFilter(e.target.value)}
+                >
+                  <option value="">Todas as fases</option>
+                  {PHASE_KEYS.map((p) => (
+                    <option key={p.key} value={p.label}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
               <div className="object-table-shell">
                 <table className="object-table">
                   <thead>
                     <tr>
+                      <th>Edital</th>
                       <th>Objeto</th>
-                      <th>Status</th>
+                      <th>Tipo</th>
+                      <th className="col-status">Status</th>
                       <th>Fase atual</th>
-                      <th>Aprovação</th>
+                      <th>Aprov. AP</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {objetos.map((item) => (
-                      <tr key={item.id}>
-                        <td className="object-name-cell">
-                          <strong>{item.nome}</strong>
-                        </td>
-                        <td>
-                          <StatusBadge
-                            label={item.status_objeto || "Sem dados"}
-                            tone={getStatusTone(item.status_objeto)}
-                          />
-                        </td>
-                        <td className="object-phase-cell">
-                          {formatDisplayText(item.fase_atual)}
-                        </td>
+                    {objetosFiltered.map((o) => (
+                      <tr key={o.id}>
+                        <td className="object-edital-cell">{o.edital}</td>
+                        <td className="object-name-cell"><strong>{o.objeto}</strong></td>
+                        <td>{o.tipo}</td>
+                        <td className="col-status"><StatusBadge statusKey={o.status} /></td>
+                        <td className="object-phase-cell">{o.faseAtual}</td>
                         <td className="object-approval-cell">
-                          {formatPercent(
-                            (Number(item?.kpis?.taxa_aprovacao) || 0) * 100,
-                          )}
+                          {o.ap.taxa != null ? formatPercent(o.ap.taxa * 100) : FALLBACK_TEXT}
                         </td>
                       </tr>
                     ))}
@@ -1088,210 +857,110 @@ export default function App() {
         )}
 
         {activeTab === "cronograma" && (
-          <section className="grid full cronograma-grid">
-            <article className="card cronograma-fill">
+          <section className="grid full">
+            <article className="card full">
               <div className="card-head">
-                <h3>Atividades suspensas</h3>
-                <InfoTooltip text='Suspensas = linhas com status contendo "Suspenso".' />
+                <h3>Cronograma — Gantt</h3>
+                <InfoTooltip text="Datas reais de AP, Acessibilidade e Insumos. Linha tracejada = previsto. Linha vermelha = HOJE." />
               </div>
-
-              {cronograma.atividades_suspensas?.length ? (
-                <ul className="list">
-                  {cronograma.atividades_suspensas.map((item, index) => (
-                    <li
-                      key={`${item.Objeto}-${item.Atividade}-${index}`}
-                      className="suspension-item"
-                    >
-                      <div className="suspension-main">
-                        <div className="suspension-index">
-                          {String(index + 1).padStart(2, "0")}
-                        </div>
-                        <div className="suspension-content">
-                          <strong>{item.Objeto || FALLBACK_TEXT}</strong>
-                          <p className="suspension-subtitle">
-                            {item.Atividade
-                              ? `Atividade: ${formatDisplayText(item.Atividade)}`
-                              : "Atividade sem descrição."}
-                          </p>
-                        </div>
-                      </div>
-                      <StatusBadge
-                        label={item.Status || "Suspenso"}
-                        tone="critico"
-                      />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="suspension-empty">
-                  Nenhuma atividade suspensa no cronograma.
-                </div>
-              )}
-            </article>
-
-            <article className="card chart">
-              <div className="card-head">
-                <h3>Status do cronograma</h3>
-                <InfoTooltip text='Status = contagem por status na aba "Status Cronograma".' />
-              </div>
-              {cronogramaBarRows.length ? (
-                <ChartContainer
-                  className="plot plot-fade-in"
-                  config={cronogramaChartConfig}
-                >
-                  <BarChart
-                    data={cronogramaBarRows}
-                    margin={{ top: 12, right: 12, bottom: 16, left: 12 }}
-                  >
-                    <CartesianGrid vertical={false} stroke={chartTheme.grid} />
-                    <XAxis
-                      dataKey="status"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{
-                        fill: chartTheme.text,
-                        fontFamily: CHART_FONT_FAMILY,
-                        fontSize: 13,
-                      }}
-                    />
-                    <YAxis
-                      allowDecimals={false}
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{
-                        fill: chartTheme.text,
-                        fontFamily: CHART_FONT_FAMILY,
-                        fontSize: 13,
-                      }}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          valueFormatter={(value) => formatNumber(value)}
-                        />
-                      }
-                    />
-                    <Bar
-                      dataKey="total"
-                      fill={chartTheme.bar}
-                      radius={[10, 10, 0, 0]}
-                    />
-                  </BarChart>
-                </ChartContainer>
-              ) : (
-                <div className="chart-empty">
-                  Nenhum status disponível no cronograma.
-                </div>
-              )}
+              <GanttChart objetos={objetos} collapsedEditals={collapsedEditals} toggleEdital={toggleEdital} setCollapsedEditals={setCollapsedEditals} />
             </article>
           </section>
         )}
 
         {activeTab === "indicadores" && (
-          <section className="grid full indicators-grid">
-            <article className="card full">
+          <section className="indicadores-main-grid">
+            <div className="indicadores-right">
+              <article className="card">
+                <div className="card-head">
+                  <h3>Coleções (Avaliação Pedagógica)</h3>
+                  <InfoTooltip text="Total agregado de aprovadas, invalidadas (inscritas-validadas) e reprovadas." />
+                </div>
+                <div className="stacked-bars">
+                  {[
+                    { label: "Aprovadas", value: apTotais.aprovadas, color: "var(--brand-strong)" },
+                    { label: "Invalidadas", value: apTotais.invalidadas, color: "var(--warning)" },
+                    { label: "Reprovadas", value: apTotais.reprovadas, color: "#dc2626" },
+                  ].map((row) => {
+                    const max = Math.max(apTotais.aprovadas, apTotais.invalidadas, apTotais.reprovadas, 1);
+                    const w = (row.value / max) * 100;
+                    return (
+                      <div key={row.label} className="stacked-bar-row">
+                        <span className="stacked-bar-label">{row.label}</span>
+                        <div className="stacked-bar-track">
+                          <div className="stacked-bar-fill" style={{ width: `${w}%`, background: row.color }} />
+                        </div>
+                        <span className="stacked-bar-value">{formatNumber(row.value)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <article className="card">
+                <div className="card-head">
+                  <h3>Fases concluídas (por fase)</h3>
+                  <InfoTooltip text='Quantidade de objetos com a fase marcada como "ok".' />
+                </div>
+                <ChartContainer className="plot plot-fade-in" config={{ ok: { label: "Concluídas" } }}>
+                  <BarChart data={kpiBarData} margin={{ top: 12, right: 12, bottom: 16, left: 12 }}>
+                    <CartesianGrid vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="fase" tickLine={false} axisLine={false} tick={{ fill: "var(--text)", fontFamily: CHART_FONT_FAMILY, fontSize: 12 }} />
+                    <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "var(--text)", fontFamily: CHART_FONT_FAMILY, fontSize: 12 }} />
+                    <ChartTooltip content={<ChartTooltipContent valueFormatter={(v) => formatNumber(v)} />} />
+                    <Bar dataKey="ok" radius={[8, 8, 0, 0]}>
+                      {kpiBarData.map((e) => (<Cell key={e.fase} fill={e.fill} />))}
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+              </article>
+            </div>
+
+            <article className="card">
               <div className="card-head">
                 <h3>Ranking de risco</h3>
-                <InfoTooltip text="Ranking = menor taxa de aprovação por objeto." />
+                <InfoTooltip text="Apenas objetos com dados de Avaliação Pedagógica. Taxa = aprovadas ÷ validadas." />
               </div>
-
-              <div className="legend">
-                <span>
-                  <span className="dot ok" />
-                  Concluído
-                </span>
-                <span>
-                  <span className="dot andamento" />
-                  Em andamento
-                </span>
-                <span>
-                  <span className="dot critico" />
-                  Sem dados
-                </span>
+              <div className="risk-table">
+                <div className="risk-header">
+                  <span className="risk-col-rank">#</span>
+                  <span className="risk-col-name">Objeto</span>
+                  <span className="risk-col-edital">Edital</span>
+                  <span className="risk-col-status">Status</span>
+                  <span className="risk-col-rate">Aprovação AP</span>
+                </div>
+                <div className="risk-rows risk-list-scroll">
+                  {riskRanking.map((o, idx) => {
+                    const pct = o.ap.taxa * 100;
+                    const rateCls = pct < 50 ? "low" : pct < 70 ? "mid" : "high";
+                    const fillBg = pct < 50 ? "#DC2626" : pct < 70 ? "#D97706" : "var(--brand-strong)";
+                    return (
+                      <div key={o.id} className={`risk-row ${idx % 2 === 1 ? "even" : ""} ${idx < 3 ? "top" : ""}`}>
+                        <span className="risk-col-rank">
+                          <span className="risk-rank-num">{idx + 1}</span>
+                        </span>
+                        <span className="risk-col-name" title={o.objeto}>
+                          {o.objeto}
+                          <small>{formatNumber(o.ap.validadas)} val. → {formatNumber(o.ap.aprovadas)} apr.</small>
+                        </span>
+                        <span className="risk-col-edital" title={o.edital}>{o.edital}</span>
+                        <span className="risk-col-status">
+                          <StatusBadge statusKey={o.status} />
+                        </span>
+                        <span className="risk-col-rate">
+                          <div className="risk-bar-wrapper">
+                            <div className="risk-bar-track">
+                              <div className="risk-bar-fill" style={{ width: `${Math.min(100, pct)}%`, background: fillBg }} />
+                            </div>
+                            <span className={`risk-rate-text ${rateCls}`}>{formatPercent(pct)}</span>
+                          </div>
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {riskRanking.length === 0 && <p className="muted">Sem dados de avaliação pedagógica.</p>}
+                </div>
               </div>
-
-              <div className="risk-list">
-                {riskRanking.map((item) => (
-                  <article key={item.id} className="risk-item">
-                    <div>
-                      <strong>{item.nome}</strong>
-                      <StatusBadge
-                        label={item.status_objeto || "Sem dados"}
-                        tone={getStatusTone(item.status_objeto)}
-                      />
-                    </div>
-                    <span>
-                      {formatPercent(
-                        (Number(item?.kpis?.taxa_aprovacao) || 0) * 100,
-                      )}
-                    </span>
-                  </article>
-                ))}
-              </div>
-            </article>
-
-            <article className="card chart wide tall full">
-              <div className="card-head">
-                <h3>Aprovação por fase</h3>
-                <InfoTooltip text="Taxa por fase = aprovadas ÷ entrada × 100 (por fase)." />
-              </div>
-              <ChartContainer
-                className="plot tall plot-fade-in"
-                config={approvalChartConfig}
-              >
-                <LineChart
-                  data={approvalByPhaseRows}
-                  margin={{ top: 18, right: 16, bottom: 24, left: 12 }}
-                >
-                  <CartesianGrid vertical={false} stroke={chartTheme.grid} />
-                  <XAxis
-                    dataKey="fase"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{
-                      fill: chartTheme.text,
-                      fontFamily: CHART_FONT_FAMILY,
-                      fontSize: 12,
-                    }}
-                  />
-                  <YAxis
-                    domain={[0, 105]}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `${value}%`}
-                    tick={{
-                      fill: chartTheme.text,
-                      fontFamily: CHART_FONT_FAMILY,
-                      fontSize: 12,
-                    }}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        valueFormatter={(value) => formatPercent(value)}
-                      />
-                    }
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="aprovacao"
-                    stroke="var(--color-aprovacao)"
-                    strokeWidth={3.5}
-                    dot={{
-                      r: 4.5,
-                      fill: chartTheme.line,
-                      stroke: chartTheme.lineMarkerStroke,
-                      strokeWidth: 2,
-                    }}
-                    activeDot={{
-                      r: 5.5,
-                      fill: chartTheme.line,
-                      stroke: chartTheme.lineMarkerStroke,
-                      strokeWidth: 2,
-                    }}
-                  />
-                </LineChart>
-              </ChartContainer>
             </article>
           </section>
         )}
@@ -1300,51 +969,67 @@ export default function App() {
           <section className="grid full">
             <article className="card full">
               <div className="card-head">
-                <h3>Objetos detalhados</h3>
-                <InfoTooltip text="Tabela com status e marcos por fase para cada objeto." />
+                <h3>Exploração</h3>
+                <InfoTooltip text="Pesquise, filtre e exporte objetos." />
+              </div>
+              <div className="exploracao-toolbar">
+                <input
+                  type="text"
+                  className="exploracao-input"
+                  placeholder="Buscar por edital, objeto, tipo..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <select className="exploracao-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                  <option value="">Todos os status</option>
+                  <option value="CONCLUIDO">Concluído</option>
+                  <option value="EM_ANDAMENTO">Em andamento</option>
+                  <option value="PENDENTE">Pendente</option>
+                  <option value="SUSPENSO">Suspenso</option>
+                  <option value="SEM_DADOS">Sem dados</option>
+                </select>
+                <select className="exploracao-select" value={filterEdital} onChange={(e) => setFilterEdital(e.target.value)}>
+                  <option value="">Todos os editais</option>
+                  {editais.map((ed) => (<option key={ed} value={ed}>{ed}</option>))}
+                </select>
+                <button type="button" className="exploracao-export" onClick={exportCSV}>Exportar CSV</button>
               </div>
 
               <div className="object-table-shell">
-                <table className="object-table">
+                <table className="object-table exploracao-table">
                   <thead>
                     <tr>
+                      <th>Edital</th>
                       <th>Objeto</th>
-                      <th>Fase</th>
-                      <th>Status da fase</th>
-                      <th>Início</th>
-                      <th>Fim</th>
+                      <th>Tipo</th>
+                      {PHASE_KEYS.map((p) => (<th key={p.key}>{p.short}</th>))}
+                      <th>Aprov. AP</th>
+                      <th>Avaliadores</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {objetos.flatMap((item) =>
-                      (item.fases || []).map((fase) => (
-                        <tr key={`${item.id}-${fase.fase}`}>
-                          <td className="object-name-cell">
-                            <strong>{item.nome}</strong>
+                    {filteredExploracao.map((o) => {
+                      const danger = o.status === "SUSPENSO" || o.status === "PENDENTE";
+                      return (
+                        <tr key={o.id} className={danger ? "row-attention" : ""}>
+                          <td>{o.edital}</td>
+                          <td className="object-name-cell"><strong>{o.objeto}</strong></td>
+                          <td>{o.tipo}</td>
+                          {o.phases.map((p) => (
+                            <td key={p.key}>
+                              <span className={HEATMAP_CELL_CLASS[p.status]}>{HEATMAP_CELL_LABEL[p.status]}</span>
+                            </td>
+                          ))}
+                          <td className="object-approval-cell">
+                            {o.ap.taxa != null ? formatPercent(o.ap.taxa * 100) : FALLBACK_TEXT}
                           </td>
-                          <td>{formatDisplayText(fase.fase)}</td>
-                          <td>{formatDisplayText(fase.status_fase)}</td>
-                          <td>
-                            {fase.inicio ||
-                              fase.previsao_inicio ||
-                              FALLBACK_TEXT}
-                          </td>
-                          <td>
-                            {fase.fim || fase.previsao_fim || FALLBACK_TEXT}
-                          </td>
+                          <td>{o.ap.avaliadores != null ? formatNumber(o.ap.avaliadores) : FALLBACK_TEXT}</td>
                         </tr>
-                      )),
-                    )}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-            </article>
-            <article className="card full">
-              <div className="card-head">
-                <h3>Snapshot bruto</h3>
-                <InfoTooltip text="Fonte única: out/snapshot.json" />
-              </div>
-              <pre className="json">{JSON.stringify(snapshot, null, 2)}</pre>
             </article>
           </section>
         )}
