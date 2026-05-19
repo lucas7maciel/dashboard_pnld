@@ -13,6 +13,7 @@ import {
   ChartTooltipContent,
 } from "./components/ui/chart.jsx";
 import GanttChart from "./components/GanttChart.jsx";
+import Simulador from "./components/Simulador.jsx";
 
 const CHART_FONT_FAMILY = "Nunito, sans-serif";
 const THEME_STORAGE_KEY = "pnld-dashboard-theme";
@@ -317,6 +318,17 @@ const ExploracaoIcon = () => (
   </Icon>
 );
 
+const SimuladorIcon = () => (
+  <Icon>
+    <path d="M4 4v16h16" />
+    <path d="M8 16l3-5 3 3 5-8" />
+    <circle cx="8" cy="16" r="1.2" />
+    <circle cx="11" cy="11" r="1.2" />
+    <circle cx="14" cy="14" r="1.2" />
+    <circle cx="19" cy="6" r="1.2" />
+  </Icon>
+);
+
 const CollapseIcon = ({ collapsed }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="toggle-icon" aria-hidden="true">
     <path d="M4 5h16v14H4z" />
@@ -464,7 +476,7 @@ export default function App() {
   useEffect(() => {
     const syncFromHash = () => {
       const hash = window.location.hash.replace("#", "").trim().toLowerCase();
-      const allowed = ["panorama", "objetos", "cronograma", "indicadores", "exploracao"];
+      const allowed = ["panorama", "objetos", "cronograma", "simulador", "indicadores", "exploracao"];
       setActiveTab(allowed.includes(hash) ? hash : "panorama");
     };
     syncFromHash();
@@ -490,6 +502,7 @@ export default function App() {
       { id: "panorama", label: "Panorama", icon: <PanoramaIcon /> },
       { id: "objetos", label: "Objetos", icon: <ObjetosIcon /> },
       { id: "cronograma", label: "Cronograma", icon: <CronogramaIcon /> },
+      { id: "simulador", label: "Simulador", icon: <SimuladorIcon /> },
       { id: "indicadores", label: "Indicadores", icon: <IndicadoresIcon /> },
       { id: "exploracao", label: "Exploração", icon: <ExploracaoIcon /> },
     ],
@@ -866,6 +879,10 @@ export default function App() {
               <GanttChart objetos={objetos} collapsedEditals={collapsedEditals} toggleEdital={toggleEdital} setCollapsedEditals={setCollapsedEditals} />
             </article>
           </section>
+        )}
+
+        {activeTab === "simulador" && (
+          <Simulador />
         )}
 
         {activeTab === "indicadores" && (
